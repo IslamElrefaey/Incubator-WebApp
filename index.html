@@ -1,0 +1,873 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="light">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>NeoGuard — Smart Infant Incubator System</title>
+    <meta name="description"
+        content="NeoGuard is a professional real-time monitoring system for smart neonatal incubators, designed for doctors and parents.">
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+
+    <!-- Firebase SDK (v10 Modular via CDN compat) -->
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-database-compat.js"></script>
+
+    <!-- Main Stylesheet -->
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+
+    <!-- ============================================================
+         SCREEN 1: AUTHENTICATION SCREEN (Login / Register)
+         Visible by default. Hidden after login.
+    ============================================================ -->
+    <div id="auth-screen" class="screen active">
+
+        <!-- Animated background blobs -->
+        <div class="auth-bg">
+            <div class="blob blob-1"></div>
+            <div class="blob blob-2"></div>
+            <div class="blob blob-3"></div>
+        </div>
+
+        <div class="auth-container">
+
+            <!-- Branding -->
+            <div class="auth-brand">
+                <div class="brand-logo">
+                    <i class="fa-solid fa-heart-pulse"></i>
+                </div>
+                <h1 class="brand-name">NeoGuard</h1>
+                <p class="brand-tagline">Smart Infant Incubator Monitoring System</p>
+            </div>
+
+            <!-- Auth Card -->
+            <div class="auth-card">
+
+                <!-- Tab switcher -->
+                <div class="auth-tabs" role="tablist">
+                    <button id="tab-login" class="auth-tab active" role="tab" aria-selected="true"
+                        aria-controls="panel-login">
+                        Sign In
+                    </button>
+                    <button id="tab-register" class="auth-tab" role="tab" aria-selected="false"
+                        aria-controls="panel-register">
+                        Register
+                    </button>
+                </div>
+
+                <!-- LOGIN PANEL -->
+                <div id="panel-login" class="auth-panel active" role="tabpanel">
+                    <form id="login-form" novalidate>
+
+                        <div class="form-group">
+                            <label for="login-email">
+                                <i class="fa-solid fa-envelope"></i> Email Address
+                            </label>
+                            <input type="email" id="login-email" placeholder="doctor@hospital.com" required
+                                autocomplete="email">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="login-password">
+                                <i class="fa-solid fa-lock"></i> Password
+                            </label>
+                            <div class="input-with-toggle">
+                                <input type="password" id="login-password" placeholder="••••••••" required
+                                    autocomplete="current-password">
+                                <button type="button" class="toggle-password" aria-label="Toggle password visibility">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Error message area -->
+                        <div id="login-error" class="auth-error hidden" role="alert"></div>
+
+                        <button type="submit" id="login-btn" class="btn btn-primary btn-full">
+                            <i class="fa-solid fa-right-to-bracket"></i>
+                            <span>Sign In</span>
+                        </button>
+
+                    </form>
+                </div>
+
+                <!-- REGISTER PANEL -->
+                <div id="panel-register" class="auth-panel" role="tabpanel">
+                    <form id="register-form" novalidate>
+
+                        <div class="form-group">
+                            <label for="reg-name">
+                                <i class="fa-solid fa-user"></i> Full Name
+                            </label>
+                            <input type="text" id="reg-name" placeholder="Dr. Ahmed Hassan" required
+                                autocomplete="name">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reg-email">
+                                <i class="fa-solid fa-envelope"></i> Email Address
+                            </label>
+                            <input type="email" id="reg-email" placeholder="doctor@hospital.com" required
+                                autocomplete="email">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="reg-password">
+                                <i class="fa-solid fa-lock"></i> Password
+                            </label>
+                            <div class="input-with-toggle">
+                                <input type="password" id="reg-password" placeholder="Min. 8 characters" required
+                                    autocomplete="new-password">
+                                <button type="button" class="toggle-password" aria-label="Toggle password visibility">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Role Selection -->
+                        <div class="form-group">
+                            <label><i class="fa-solid fa-user-tag"></i> Select Your Role</label>
+                            <div class="role-selector" id="role-selector">
+                                <label class="role-option" for="role-doctor">
+                                    <input type="radio" id="role-doctor" name="user-role" value="doctor" checked>
+                                    <div class="role-card">
+                                        <i class="fa-solid fa-stethoscope"></i>
+                                        <span>Doctor</span>
+                                        <small>Full access & control</small>
+                                    </div>
+                                </label>
+                                <label class="role-option" for="role-parent">
+                                    <input type="radio" id="role-parent" name="user-role" value="parent">
+                                    <div class="role-card">
+                                        <i class="fa-solid fa-people-roof"></i>
+                                        <span>Parent</span>
+                                        <small>View-only access</small>
+                                    </div>
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Error message area -->
+                        <div id="register-error" class="auth-error hidden" role="alert"></div>
+
+                        <button type="submit" id="register-btn" class="btn btn-primary btn-full">
+                            <i class="fa-solid fa-user-plus"></i>
+                            <span>Create Account</span>
+                        </button>
+
+                    </form>
+                </div>
+
+            </div>
+            <!-- /auth-card -->
+
+        </div>
+        <!-- /auth-container -->
+
+    </div>
+    <!-- /auth-screen -->
+
+
+    <!-- ============================================================
+         SCREEN 2: DOCTOR DASHBOARD
+         Hidden by default. Shown after doctor login.
+    ============================================================ -->
+    <div id="doctor-screen" class="screen">
+
+        <!-- TOP NAVBAR -->
+        <nav class="top-nav" id="doctor-nav">
+            <div class="nav-brand">
+                <button id="sidebar-toggle-btn" class="icon-btn sidebar-toggle" aria-label="Toggle Sidebar">
+                    <i class="fa-solid fa-bars"></i>
+                </button>
+                <div class="brand-logo-sm">
+                    <i class="fa-solid fa-heart-pulse"></i>
+                </div>
+                <span class="nav-brand-name">NeoGuard</span>
+                <span class="nav-role-badge role-doctor">Doctor</span>
+            </div>
+
+            <div class="nav-actions">
+
+
+                <!-- Dark mode toggle -->
+                <button id="doc-theme-toggle" class="icon-btn theme-toggle-btn" aria-label="Toggle dark mode">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+
+                <!-- User profile dropdown -->
+                <div class="user-menu" id="doctor-user-menu">
+                    <button class="user-avatar-btn" id="doctor-avatar-btn" aria-label="User menu" aria-haspopup="true"
+                        aria-expanded="false">
+                        <div class="user-avatar" id="doctor-avatar-initials">DR</div>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </button>
+                    <div class="dropdown-menu" id="doctor-dropdown" role="menu">
+                        <div class="dropdown-header">
+                            <p class="dropdown-user-name" id="doctor-display-name">Dr. Name</p>
+                            <p class="dropdown-user-email" id="doctor-display-email">email@hospital.com</p>
+                        </div>
+                        <hr class="dropdown-divider">
+                        <button class="dropdown-item" id="doctor-logout-btn" role="menuitem">
+                            <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+        <!-- /top-nav -->
+
+        <!-- PAGE BODY: Sidebar + Main Content -->
+        <div class="dashboard-body">
+
+            <!-- SIDEBAR: Incubator List -->
+            <aside class="sidebar" id="doctor-sidebar" aria-label="Incubator list sidebar">
+                <div class="sidebar-header">
+                    <h2 class="sidebar-title">
+                        <i class="fa-solid fa-list-ul"></i> Incubators
+                    </h2>
+                    <span class="incubator-count" id="incubator-count">0</span>
+                </div>
+
+                <!-- Add New Incubator Button -->
+                <button id="add-incubator-btn" class="btn btn-primary btn-add-incubator">
+                    <i class="fa-solid fa-plus"></i>
+                    <span>Add New Incubator</span>
+                </button>
+
+                <!-- Incubator List -->
+                <div class="sidebar-list" id="incubator-sidebar-list" role="list">
+                    <!-- Incubator items are injected here by JavaScript -->
+                    <div class="sidebar-empty" id="sidebar-empty-state">
+                        <i class="fa-solid fa-inbox"></i>
+                        <p>No incubators yet.</p>
+                        <small>Click "Add New" to get started.</small>
+                    </div>
+                </div>
+            </aside>
+            <!-- /sidebar -->
+
+            <!-- MAIN CONTENT AREA -->
+            <main class="main-content" id="doctor-main">
+
+                <!-- State: No incubator selected -->
+                <div id="no-incubator-selected" class="empty-content-state">
+                    <div class="empty-state-icon">
+                        <i class="fa-solid fa-baby"></i>
+                    </div>
+                    <h2>Welcome, Doctor</h2>
+                    <p>Select an incubator from the sidebar to view real-time patient data, or add a new one to get
+                        started.</p>
+                    <button class="btn btn-primary" id="empty-add-btn">
+                        <i class="fa-solid fa-plus"></i> Add Incubator
+                    </button>
+                </div>
+
+                <!-- State: Incubator selected — Dashboard -->
+                <div id="incubator-dashboard" class="hidden">
+
+                    <!-- Patient Info Header -->
+                    <div class="patient-header">
+                        <div class="patient-info">
+                            <div class="patient-avatar">
+                                <i class="fa-solid fa-baby"></i>
+                            </div>
+                            <div class="patient-details">
+                                <h2 id="dashboard-baby-name">Baby Name</h2>
+                                <p>
+                                    Parent: <strong id="dashboard-parent-name">—</strong>
+                                    &nbsp;|&nbsp;
+                                    Code: <code id="dashboard-child-code">—</code>
+                                    &nbsp;|&nbsp;
+                                    Device ID: <code id="dashboard-device-id">—</code>
+                                </p>
+                            </div>
+                        </div>
+                        <div class="patient-meta">
+                            <div class="last-updated-badge" id="last-updated-badge">
+                                <i class="fa-solid fa-satellite-dish"></i>
+                                <span id="last-updated-text">Waiting for data...</span>
+                            </div>
+                            <div class="patient-status-badge">
+                                <i class="fa-solid fa-circle-check"></i>
+                                <span>Live Monitoring</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Alert Banner -->
+                    <div id="alert-banner" class="alert-banner hidden" role="alert">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        <span id="alert-message">Warning message</span>
+                        <button id="alert-close-btn" class="alert-close" aria-label="Dismiss alert">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <!-- Sensor Data Cards -->
+                    <div class="sensor-cards-grid">
+
+                        <div class="sensor-card card-temperature">
+                            <div class="sensor-card-icon">
+                                <i class="fa-solid fa-temperature-half"></i>
+                            </div>
+                            <div class="sensor-card-body">
+                                <span class="sensor-label">Temperature</span>
+                                <div class="sensor-value-row">
+                                    <span class="sensor-value" id="temp-val">--</span>
+                                    <span class="sensor-unit">°C</span>
+                                </div>
+                                <div class="sensor-progress-bar">
+                                    <div class="sensor-progress-fill temp-fill" id="temp-progress" style="width: 0%">
+                                    </div>
+                                </div>
+                                <span class="sensor-range">Normal: 36.5°C – 37.5°C</span>
+                            </div>
+                        </div>
+
+                        <div class="sensor-card card-humidity">
+                            <div class="sensor-card-icon">
+                                <i class="fa-solid fa-droplet"></i>
+                            </div>
+                            <div class="sensor-card-body">
+                                <span class="sensor-label">Humidity</span>
+                                <div class="sensor-value-row">
+                                    <span class="sensor-value" id="hum-val">--</span>
+                                    <span class="sensor-unit">%</span>
+                                </div>
+                                <div class="sensor-progress-bar">
+                                    <div class="sensor-progress-fill hum-fill" id="hum-progress" style="width: 0%">
+                                    </div>
+                                </div>
+                                <span class="sensor-range">Target: 50% – 70%</span>
+                            </div>
+                        </div>
+
+                        <div class="sensor-card card-jaundice">
+                            <div class="sensor-card-icon">
+                                <i class="fa-solid fa-eye"></i>
+                            </div>
+                            <div class="sensor-card-body">
+                                <span class="sensor-label">Jaundice Status</span>
+                                <div class="sensor-value-row">
+                                    <span class="sensor-value jaundice-value" id="jaundice-val">--</span>
+                                </div>
+                                <div class="jaundice-indicator" id="jaundice-indicator">
+                                    <div class="jaundice-dot"></div>
+                                    <span id="jaundice-level-text">Analyzing...</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="sensor-card card-heartrate">
+                            <div class="sensor-card-icon">
+                                <i class="fa-solid fa-heart-pulse"></i>
+                            </div>
+                            <div class="sensor-card-body">
+                                <span class="sensor-label">Heart Rate</span>
+                                <div class="sensor-value-row">
+                                    <span class="sensor-value" id="hr-val">--</span>
+                                    <span class="sensor-unit">BPM</span>
+                                </div>
+                                <div class="sensor-progress-bar">
+                                    <div class="sensor-progress-fill hr-fill" id="hr-progress" style="width: 0%"></div>
+                                </div>
+                                <span class="sensor-range">Normal: 120 – 160 BPM</span>
+                            </div>
+                        </div>
+
+                    </div>
+                    <!-- /sensor-cards-grid -->
+
+                    <!-- Two-column: ECG chart + Doctor Controls -->
+                    <div class="bottom-grid">
+
+                        <!-- ECG Chart -->
+                        <div class="chart-panel">
+                            <div class="panel-header">
+                                <h3>
+                                    <i class="fa-solid fa-wave-square"></i> ECG Signal
+                                </h3>
+                                <div class="chart-controls">
+                                    <span class="live-badge">
+                                        <i class="fa-solid fa-circle"></i> Live
+                                    </span>
+                                </div>
+                            </div>
+                            <div class="chart-wrapper">
+                                <canvas id="ecgChart" aria-label="ECG Signal Chart"></canvas>
+                            </div>
+                        </div>
+
+                        <!-- Doctor Controls Panel -->
+                        <div class="controls-panel">
+                            <div class="panel-header">
+                                <h3>
+                                    <i class="fa-solid fa-sliders"></i> Controls
+                                </h3>
+                                <span class="doc-only-badge">Doctor Only</span>
+                            </div>
+
+                            <!-- Target Temperature -->
+                            <div class="control-group">
+                                <label for="target-temp-input" class="control-label">
+                                    <i class="fa-solid fa-temperature-arrow-up"></i>
+                                    Target Temperature
+                                </label>
+                                <div class="control-input-row">
+                                    <input type="number" id="target-temp-input" class="control-input" min="35" max="40"
+                                        step="0.1" value="37.0" placeholder="37.0">
+                                    <span class="control-unit">°C</span>
+                                </div>
+                                <input type="range" id="target-temp-slider" class="temp-slider" min="35" max="40"
+                                    step="0.1" value="37.0" aria-label="Target temperature slider">
+                                <button id="set-target-temp-btn" class="btn btn-control">
+                                    <i class="fa-solid fa-floppy-disk"></i> Apply to Device
+                                </button>
+                                <div class="control-feedback hidden" id="temp-feedback">
+                                    <i class="fa-solid fa-check-circle"></i>
+                                    Command sent to ESP32!
+                                </div>
+                            </div>
+
+                            <hr class="control-divider">
+
+                            <!-- Light therapy toggle (Jaundice) -->
+                            <div class="control-group">
+                                <label class="control-label">
+                                    <i class="fa-solid fa-sun"></i>
+                                    Phototherapy Light
+                                </label>
+                                <div class="toggle-switch-row">
+                                    <span>OFF</span>
+                                    <label class="toggle-switch" for="photo-therapy-toggle"
+                                        aria-label="Phototherapy toggle">
+                                        <input type="checkbox" id="photo-therapy-toggle">
+                                        <span class="toggle-track"></span>
+                                    </label>
+                                    <span>ON</span>
+                                </div>
+                                <p class="control-hint">Activates blue light therapy unit in incubator.</p>
+                            </div>
+
+                            <hr class="control-divider">
+
+                            <!-- Alarm Threshold -->
+                            <div class="control-group">
+                                <label for="alarm-threshold-input" class="control-label">
+                                    <i class="fa-solid fa-bell"></i>
+                                    Alarm Threshold (Temp)
+                                </label>
+                                <div class="control-input-row">
+                                    <input type="number" id="alarm-threshold-input" class="control-input" min="35"
+                                        max="42" step="0.5" value="38.5" placeholder="38.5">
+                                    <span class="control-unit">°C</span>
+                                </div>
+                                <button id="set-alarm-btn" class="btn btn-control btn-warning-control">
+                                    <i class="fa-solid fa-floppy-disk"></i> Set Alarm
+                                </button>
+                            </div>
+
+                        </div>
+                        <!-- /controls-panel -->
+
+                    </div>
+                    <!-- /bottom-grid -->
+
+                </div>
+                <!-- /incubator-dashboard -->
+
+            </main>
+            <!-- /main-content -->
+
+        </div>
+        <!-- /dashboard-body -->
+
+    </div>
+    <!-- /doctor-screen -->
+
+
+    <!-- ============================================================
+         SCREEN 3: PARENT DASHBOARD
+         Hidden by default. Shown after parent login.
+    ============================================================ -->
+    <div id="parent-screen" class="screen">
+
+        <!-- TOP NAVBAR -->
+        <nav class="top-nav" id="parent-nav">
+            <div class="nav-brand">
+                <div class="brand-logo-sm">
+                    <i class="fa-solid fa-heart-pulse"></i>
+                </div>
+                <span class="nav-brand-name">NeoGuard</span>
+                <span class="nav-role-badge role-parent">Parent</span>
+            </div>
+
+            <div class="nav-actions">
+
+
+                <button id="parent-theme-toggle" class="icon-btn theme-toggle-btn" aria-label="Toggle dark mode">
+                    <i class="fa-solid fa-moon"></i>
+                </button>
+
+                <div class="user-menu" id="parent-user-menu">
+                    <button class="user-avatar-btn" id="parent-avatar-btn" aria-label="User menu" aria-haspopup="true"
+                        aria-expanded="false">
+                        <div class="user-avatar" id="parent-avatar-initials">PR</div>
+                        <i class="fa-solid fa-chevron-down"></i>
+                    </button>
+                    <div class="dropdown-menu" id="parent-dropdown" role="menu">
+                        <div class="dropdown-header">
+                            <p class="dropdown-user-name" id="parent-display-name">Parent Name</p>
+                            <p class="dropdown-user-email" id="parent-display-email">email@example.com</p>
+                        </div>
+                        <hr class="dropdown-divider">
+                        <button class="dropdown-item" id="parent-logout-btn" role="menuitem">
+                            <i class="fa-solid fa-right-from-bracket"></i> Sign Out
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- PARENT MAIN CONTENT -->
+        <div class="parent-body">
+
+            <!-- Step 1: Access Code Entry (shown before authentication) -->
+            <div id="parent-code-entry" class="parent-gate">
+                <div class="gate-card">
+                    <div class="gate-icon">
+                        <i class="fa-solid fa-shield-heart"></i>
+                    </div>
+                    <h2>Access Your Baby's Monitor</h2>
+                    <p>Enter the Child Code and Password provided by your doctor to view your baby's incubator data.</p>
+
+                    <form id="parent-access-form" novalidate>
+
+                        <div class="form-group">
+                            <label for="parent-child-code">
+                                <i class="fa-solid fa-fingerprint"></i> Child Code
+                            </label>
+                            <input type="text" id="parent-child-code" placeholder="e.g. NC-A1B2" required
+                                autocomplete="off">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="parent-child-password">
+                                <i class="fa-solid fa-key"></i> Password
+                            </label>
+                            <div class="input-with-toggle">
+                                <input type="password" id="parent-child-password" placeholder="••••••••" required
+                                    autocomplete="off">
+                                <button type="button" class="toggle-password" aria-label="Toggle password visibility">
+                                    <i class="fa-solid fa-eye"></i>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div id="parent-access-error" class="auth-error hidden" role="alert"></div>
+
+                        <button type="submit" id="parent-access-btn" class="btn btn-primary btn-full">
+                            <i class="fa-solid fa-lock-open"></i>
+                            <span>Access Dashboard</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+            <!-- /parent-gate -->
+
+            <!-- Step 2: Parent View-Only Dashboard (shown after successful code entry) -->
+            <div id="parent-dashboard" class="hidden">
+
+                <!-- Patient Info Banner -->
+                <div class="patient-header parent-header">
+                    <div class="patient-info">
+                        <div class="patient-avatar">
+                            <i class="fa-solid fa-baby"></i>
+                        </div>
+                        <div class="patient-details">
+                            <h2 id="parent-baby-name">Baby Name</h2>
+                            <p>Your baby is currently being monitored by the care team.</p>
+                        </div>
+                    </div>
+                    <div class="view-only-badge">
+                        <i class="fa-solid fa-eye"></i>
+                        <span>View Only</span>
+                    </div>
+                </div>
+
+                <!-- Alert Banner for parents -->
+                <div id="parent-alert-banner" class="alert-banner hidden" role="alert">
+                    <i class="fa-solid fa-triangle-exclamation"></i>
+                    <span id="parent-alert-message">Warning message</span>
+                </div>
+
+                <!-- Sensor Cards (Read-Only) -->
+                <div class="sensor-cards-grid">
+
+                    <div class="sensor-card card-temperature">
+                        <div class="sensor-card-icon">
+                            <i class="fa-solid fa-temperature-half"></i>
+                        </div>
+                        <div class="sensor-card-body">
+                            <span class="sensor-label">Temperature</span>
+                            <div class="sensor-value-row">
+                                <span class="sensor-value" id="p-temp-val">--</span>
+                                <span class="sensor-unit">°C</span>
+                            </div>
+                            <div class="sensor-progress-bar">
+                                <div class="sensor-progress-fill temp-fill" id="p-temp-progress" style="width: 0%">
+                                </div>
+                            </div>
+                            <span class="sensor-range">Normal: 36.5°C – 37.5°C</span>
+                        </div>
+                    </div>
+
+                    <div class="sensor-card card-humidity">
+                        <div class="sensor-card-icon">
+                            <i class="fa-solid fa-droplet"></i>
+                        </div>
+                        <div class="sensor-card-body">
+                            <span class="sensor-label">Humidity</span>
+                            <div class="sensor-value-row">
+                                <span class="sensor-value" id="p-hum-val">--</span>
+                                <span class="sensor-unit">%</span>
+                            </div>
+                            <div class="sensor-progress-bar">
+                                <div class="sensor-progress-fill hum-fill" id="p-hum-progress" style="width: 0%"></div>
+                            </div>
+                            <span class="sensor-range">Target: 50% – 70%</span>
+                        </div>
+                    </div>
+
+                    <div class="sensor-card card-jaundice">
+                        <div class="sensor-card-icon">
+                            <i class="fa-solid fa-eye"></i>
+                        </div>
+                        <div class="sensor-card-body">
+                            <span class="sensor-label">Jaundice Status</span>
+                            <div class="sensor-value-row">
+                                <span class="sensor-value jaundice-value" id="p-jaundice-val">--</span>
+                            </div>
+                            <div class="jaundice-indicator" id="p-jaundice-indicator">
+                                <div class="jaundice-dot"></div>
+                                <span id="p-jaundice-level-text">Analyzing...</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="sensor-card card-heartrate">
+                        <div class="sensor-card-icon">
+                            <i class="fa-solid fa-heart-pulse"></i>
+                        </div>
+                        <div class="sensor-card-body">
+                            <span class="sensor-label">Heart Rate</span>
+                            <div class="sensor-value-row">
+                                <span class="sensor-value" id="p-hr-val">--</span>
+                                <span class="sensor-unit">BPM</span>
+                            </div>
+                            <div class="sensor-progress-bar">
+                                <div class="sensor-progress-fill hr-fill" id="p-hr-progress" style="width: 0%"></div>
+                            </div>
+                            <span class="sensor-range">Normal: 120 – 160 BPM</span>
+                        </div>
+                    </div>
+
+                </div>
+
+                <!-- ECG Chart for Parents -->
+                <div class="chart-panel">
+                    <div class="panel-header">
+                        <h3>
+                            <i class="fa-solid fa-wave-square"></i> ECG Signal
+                        </h3>
+                        <span class="live-badge">
+                            <i class="fa-solid fa-circle"></i> Live
+                        </span>
+                    </div>
+                    <div class="chart-wrapper">
+                        <canvas id="ecgChartParent" aria-label="ECG Signal Chart (Parent View)"></canvas>
+                    </div>
+                </div>
+
+                <!-- Reassurance message -->
+                <div class="parent-reassurance">
+                    <i class="fa-solid fa-circle-info"></i>
+                    <p>You are viewing real-time data. Only your healthcare team can make changes to the device
+                        settings. If you have any concerns, please contact the hospital directly.</p>
+                </div>
+
+            </div>
+            <!-- /parent-dashboard -->
+
+        </div>
+        <!-- /parent-body -->
+
+    </div>
+    <!-- /parent-screen -->
+
+
+    <!-- ============================================================
+         MODAL: Add New Incubator
+         Opened when doctor clicks "Add New Incubator"
+    ============================================================ -->
+    <div id="add-incubator-modal" class="modal-overlay hidden" role="dialog" aria-modal="true"
+        aria-labelledby="modal-title">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2 id="modal-title">
+                    <i class="fa-solid fa-plus-circle"></i> Add New Incubator
+                </h2>
+                <button class="modal-close-btn" id="modal-close-btn" aria-label="Close modal">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="modal-body">
+                <form id="add-incubator-form" novalidate>
+
+                    <div class="form-group">
+                        <label for="esp-device-id">
+                            <i class="fa-solid fa-microchip"></i> Incubator ID
+                        </label>
+                        <input type="text" id="esp-device-id" placeholder="e.g. ESP-A1B2C3D4" required>
+                        <small class="form-hint">The unique hardware ID of the ESP32 module.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="new-baby-name">
+                            <i class="fa-solid fa-baby"></i> Baby's Name
+                        </label>
+                        <input type="text" id="new-baby-name" placeholder="e.g. Baby Omar" required>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="new-parent-name">
+                            <i class="fa-solid fa-person"></i> Parent's Name
+                        </label>
+                        <input type="text" id="new-parent-name" placeholder="e.g. Mr. & Mrs. Hassan" required>
+                    </div>
+
+                    <!-- Auto-Generated Fields Preview -->
+                    <div class="auto-gen-preview" id="auto-gen-preview">
+                        <div class="auto-gen-info">
+                            <i class="fa-solid fa-sparkles"></i>
+                            <p>The system will <strong>automatically generate</strong> a unique <strong>Child
+                                    Code</strong> and <strong>Password</strong> upon submission. Share these with the
+                                parents.</p>
+                        </div>
+                    </div>
+
+                    <div id="add-incubator-error" class="auth-error hidden" role="alert"></div>
+
+                    <div class="modal-actions">
+                        <button type="button" class="btn btn-ghost" id="modal-cancel-btn">Cancel</button>
+                        <button type="submit" class="btn btn-primary" id="add-incubator-submit-btn">
+                            <i class="fa-solid fa-plus"></i>
+                            <span>Create Incubator</span>
+                        </button>
+                    </div>
+
+                </form>
+            </div>
+        </div>
+    </div>
+    <!-- /add-incubator-modal -->
+
+
+    <!-- ============================================================
+         MODAL: Incubator Credentials (shown after successful creation)
+         Displays the auto-generated Code and Password for the doctor to share.
+    ============================================================ -->
+    <div id="credentials-modal" class="modal-overlay hidden" role="dialog" aria-modal="true"
+        aria-labelledby="credentials-title">
+        <div class="modal-box modal-box-sm">
+            <div class="modal-header">
+                <h2 id="credentials-title">
+                    <i class="fa-solid fa-key"></i> Incubator Created!
+                </h2>
+            </div>
+
+            <div class="modal-body">
+                <div class="credentials-success">
+                    <div class="credentials-icon">
+                        <i class="fa-solid fa-circle-check"></i>
+                    </div>
+                    <p class="credentials-intro">The incubator has been registered. Share these credentials with the
+                        parent:</p>
+
+                    <div class="credential-item">
+                        <span class="credential-label">Baby Name</span>
+                        <span class="credential-value" id="cred-baby-name">—</span>
+                    </div>
+                    <div class="credential-item">
+                        <span class="credential-label">Child Code</span>
+                        <div class="credential-copy-row">
+                            <code class="credential-code" id="cred-child-code">—</code>
+                            <button class="btn-copy" data-target="cred-child-code" title="Copy code">
+                                <i class="fa-solid fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="credential-item">
+                        <span class="credential-label">Password</span>
+                        <div class="credential-copy-row">
+                            <code class="credential-code" id="cred-password">—</code>
+                            <button class="btn-copy" data-target="cred-password" title="Copy password">
+                                <i class="fa-solid fa-copy"></i>
+                            </button>
+                        </div>
+                    </div>
+
+                    <p class="credentials-warning">
+                        <i class="fa-solid fa-triangle-exclamation"></i>
+                        Save these credentials now. The password will not be shown again.
+                    </p>
+                </div>
+
+                <div class="modal-actions">
+                    <button class="btn btn-primary btn-full" id="credentials-done-btn">
+                        <i class="fa-solid fa-check"></i> Done
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- /credentials-modal -->
+
+
+    <!-- ============================================================
+         GLOBAL: Loading Overlay
+         Shown during async operations (login, Firebase calls)
+    ============================================================ -->
+    <div id="loading-overlay" class="loading-overlay hidden" aria-live="polite" aria-label="Loading">
+        <div class="loading-spinner">
+            <div class="spinner-ring"></div>
+            <div class="spinner-logo">
+                <i class="fa-solid fa-heart-pulse"></i>
+            </div>
+        </div>
+        <p class="loading-text" id="loading-text">Loading...</p>
+    </div>
+
+
+    <!-- Main Application Script -->
+    <script src="app.js" defer></script>
+</body>
+
+</html>
