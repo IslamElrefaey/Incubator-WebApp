@@ -501,16 +501,25 @@ function listenToSensorData(incubatorId) {
     const handler = sensorRef.on('value', (snap) => {
         const data = snap.val();
         if (!data) return;
+
+        // Update temperature, humidity, heart rate, jaundice UI
         updateSensorUI(data, false);
+
+        // Update ECG chart ONLY from Firebase — no mock data
+        if (data.ecg !== null && data.ecg !== undefined) {
+            const ecgVal = parseFloat(data.ecg);
+            if (!isNaN(ecgVal)) {
+                pushECGSample(ecgChart, ecgVal);
+                pushECGSample(ecgChartParent, ecgVal);
+            }
+        }
+
         updateLastUpdated(); // stamp data freshness
     });
 
     sensorListeners.push(() => sensorRef.off('value', handler));
     // Register with global listeners too so logout clears them
     activeListeners.push(() => sensorRef.off('value', handler));
-
-    // Simulate ECG from Firebase or locally
-    startECGSimulation(incubatorId);
 }
 
 function updateSensorUI(data, isParent) {
@@ -707,61 +716,8 @@ function pushECGSample(chart, value) {
     chart.update('none');
 }
 
-/** Simulate a realistic ECG waveform locally (or read from Firebase) */
-let ecgSimInterval = null;
-let ecgPhase = 0;
-
-function startECGSimulation(incubatorId) {
-    stopECGSimulation();
-
-    // Try to read ECG from Firebase first; fall back to simulation
-    const ecgRef = db.ref(`Incubators/${incubatorId}/sensors/ecg`);
-    let usingCloud = false;
-
-    const ecgHandler = ecgRef.on('value', (snap) => {
-        const val = snap.val();
-        if (val !== null && val !== undefined) {
-            usingCloud = true;
-            pushECGSample(ecgChart, parseFloat(val));
-            pushECGSample(ecgChartParent, parseFloat(val));
-        }
-    });
-    activeListeners.push(() => ecgRef.off('value', ecgHandler));
-
-    // Start local simulation (runs alongside; if cloud data arrives it takes over visually)
-    ecgSimInterval = setInterval(() => {
-        if (!usingCloud) {
-            const sample = generateECGSample();
-            pushECGSample(ecgChart, sample);
-            pushECGSample(ecgChartParent, sample);
-        }
-    }, 40); // ~25 FPS
-}
-
-function stopECGSimulation() {
-    if (ecgSimInterval) { clearInterval(ecgSimInterval); ecgSimInterval = null; }
-}
-
-/** Generate one synthetic ECG sample based on a phase counter */
-function generateECGSample() {
-    ecgPhase += 0.08;
-    if (ecgPhase > 2 * Math.PI) ecgPhase -= 2 * Math.PI;
-
-    const t = ecgPhase;
-
-    // P wave
-    let val = 0.2 * Math.exp(-Math.pow((t - 0.5) * 8, 2));
-    // QRS complex
-    val += -0.3 * Math.exp(-Math.pow((t - 1.0) * 18, 2));
-    val += 1.8 * Math.exp(-Math.pow((t - 1.15) * 22, 2));
-    val += -0.2 * Math.exp(-Math.pow((t - 1.3) * 18, 2));
-    // T wave
-    val += 0.35 * Math.exp(-Math.pow((t - 1.9) * 7, 2));
-    // Baseline noise
-    val += (Math.random() - 0.5) * 0.04;
-
-    return val;
-}
+// ECG is handled exclusively inside the Firebase sensors onValue listener (see listenToSensorData).
+// No local simulation or setInterval — the chart only updates when real data arrives from Firebase.
 
 // ----------------------------------------------------------------
 // 17. ADD INCUBATOR MODAL
