@@ -239,6 +239,22 @@ img {
     border-color: var(--color-warning);
 }
 
+.btn-danger {
+    background: linear-gradient(135deg, #ef4444, #dc2626);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(239, 68, 68, .3);
+}
+
+.btn-danger:hover {
+    background: linear-gradient(135deg, #dc2626, #b91c1c);
+    box-shadow: 0 6px 20px rgba(239, 68, 68, .45);
+    transform: translateY(-1px);
+}
+
+.btn-danger:active {
+    transform: translateY(0);
+}
+
 .icon-btn {
     display: inline-flex;
     align-items: center;
@@ -1045,9 +1061,13 @@ img {
     width: 8px;
     height: 8px;
     border-radius: 50%;
-    background: var(--color-success);
+    background: var(--color-danger);
     flex-shrink: 0;
-    box-shadow: 0 0 6px rgba(16, 185, 129, .6);
+}
+
+.sidebar-item-online.is-online {
+    background: var(--color-success);
+    box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
 }
 
 /* Sidebar toggle button */
@@ -1187,10 +1207,33 @@ img {
     font-size: 12.5px;
     font-weight: 600;
     white-space: nowrap;
+    transition: var(--transition);
 }
 
 .patient-status-badge i {
     animation: blink 2s ease-in-out infinite;
+}
+
+/* Offline state for patient status badge */
+.patient-status-badge.status-offline {
+    background: rgba(239, 68, 68, .1);
+    border-color: rgba(239, 68, 68, .25);
+    color: var(--color-danger);
+}
+
+.patient-status-badge.status-offline i {
+    animation: none;
+}
+
+/* Offline state for ECG live badge */
+.live-badge.status-offline {
+    background: rgba(100, 116, 139, .12);
+    border-color: rgba(100, 116, 139, .25);
+    color: var(--text-muted);
+}
+
+.live-badge.status-offline i {
+    animation: none;
 }
 
 /* Patient header right-side grouping */
@@ -1465,7 +1508,7 @@ img {
 ---------------------------------------------------------------- */
 .bottom-grid {
     display: grid;
-    grid-template-columns: 1fr 320px;
+    grid-template-columns: 1fr;
     gap: 16px;
     align-items: start;
 }
@@ -1555,6 +1598,91 @@ img {
 
 .controls-panel .panel-header {
     border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+/* Controls inner grid: 3 equal control groups + narrow delete column */
+.controls-panel .controls-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr 100px;
+    align-items: stretch;
+    min-height: 140px;
+}
+
+.controls-panel .controls-body hr.control-divider {
+    display: none;
+}
+
+.controls-panel .controls-body .control-group {
+    border-right: 1px solid var(--border-color);
+}
+
+.controls-panel .controls-body .control-group:last-child {
+    border-right: none;
+}
+
+/* Delete column — vertical rectangle at far right */
+.controls-panel .controls-body .control-group:last-child {
+    display: flex;
+    align-items: stretch;
+    padding: 0;
+}
+
+.controls-panel .controls-body .control-group:last-child #delete-incubator-btn {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 8px;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    border-radius: 0 0 var(--radius-lg) 0;
+    background: #ef4444;
+    /* Force red danger background */
+    color: #fff;
+    white-space: normal;
+    text-align: center;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: .5px;
+    text-transform: uppercase;
+    line-height: 1.2;
+}
+
+.controls-panel .controls-body .control-group:last-child #delete-incubator-btn i {
+    font-size: 24px;
+    flex-shrink: 0;
+}
+
+/* Mobile: stack all controls vertically */
+@media (max-width: 768px) {
+    .controls-panel .controls-body {
+        grid-template-columns: 1fr;
+        min-height: unset;
+    }
+
+    .controls-panel .controls-body .control-group {
+        border-right: none;
+        border-bottom: 1px solid var(--border-color);
+    }
+
+    .controls-panel .controls-body .control-group:last-child {
+        border-bottom: none;
+        padding: 0;
+    }
+
+    .controls-panel .controls-body .control-group:last-child #delete-incubator-btn {
+        flex-direction: row;
+        border-radius: 0 0 var(--radius-lg) var(--radius-lg);
+        padding: 14px 20px;
+        min-height: 52px;
+        justify-content: center;
+        gap: 10px;
+    }
+
+    .controls-panel .controls-body .control-group:last-child #delete-incubator-btn i {
+        font-size: 16px;
+    }
 }
 
 .control-group {

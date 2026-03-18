@@ -303,7 +303,7 @@
                                 <i class="fa-solid fa-satellite-dish"></i>
                                 <span id="last-updated-text">Waiting for data...</span>
                             </div>
-                            <div class="patient-status-badge">
+                            <div class="patient-status-badge" id="patient-status-badge">
                                 <i class="fa-solid fa-circle-check"></i>
                                 <span>Live Monitoring</span>
                             </div>
@@ -404,7 +404,7 @@
                                     <i class="fa-solid fa-wave-square"></i> ECG Signal
                                 </h3>
                                 <div class="chart-controls">
-                                    <span class="live-badge">
+                                    <span class="live-badge" id="ecg-live-badge">
                                         <i class="fa-solid fa-circle"></i> Live
                                     </span>
                                 </div>
@@ -423,65 +423,72 @@
                                 <span class="doc-only-badge">Doctor Only</span>
                             </div>
 
-                            <!-- Target Temperature -->
-                            <div class="control-group">
-                                <label for="target-temp-input" class="control-label">
-                                    <i class="fa-solid fa-temperature-arrow-up"></i>
-                                    Target Temperature
-                                </label>
-                                <div class="control-input-row">
-                                    <input type="number" id="target-temp-input" class="control-input" min="35" max="40"
-                                        step="0.1" value="37.0" placeholder="37.0">
-                                    <span class="control-unit">°C</span>
-                                </div>
-                                <input type="range" id="target-temp-slider" class="temp-slider" min="35" max="40"
-                                    step="0.1" value="37.0" aria-label="Target temperature slider">
-                                <button id="set-target-temp-btn" class="btn btn-control">
-                                    <i class="fa-solid fa-floppy-disk"></i> Apply to Device
-                                </button>
-                                <div class="control-feedback hidden" id="temp-feedback">
-                                    <i class="fa-solid fa-check-circle"></i>
-                                    Command sent to ESP32!
-                                </div>
-                            </div>
+                            <div class="controls-body">
 
-                            <hr class="control-divider">
-
-                            <!-- Light therapy toggle (Jaundice) -->
-                            <div class="control-group">
-                                <label class="control-label">
-                                    <i class="fa-solid fa-sun"></i>
-                                    Phototherapy Light
-                                </label>
-                                <div class="toggle-switch-row">
-                                    <span>OFF</span>
-                                    <label class="toggle-switch" for="photo-therapy-toggle"
-                                        aria-label="Phototherapy toggle">
-                                        <input type="checkbox" id="photo-therapy-toggle">
-                                        <span class="toggle-track"></span>
+                                <!-- Target Temperature -->
+                                <div class="control-group">
+                                    <label for="target-temp-input" class="control-label">
+                                        <i class="fa-solid fa-temperature-arrow-up"></i>
+                                        Target Temperature
                                     </label>
-                                    <span>ON</span>
+                                    <div class="control-input-row">
+                                        <input type="number" id="target-temp-input" class="control-input" min="35"
+                                            max="40" step="0.1" value="37.0" placeholder="37.0">
+                                        <span class="control-unit">°C</span>
+                                    </div>
+                                    <input type="range" id="target-temp-slider" class="temp-slider" min="35" max="40"
+                                        step="0.1" value="37.0" aria-label="Target temperature slider">
+                                    <button id="set-target-temp-btn" class="btn btn-control">
+                                        <i class="fa-solid fa-floppy-disk"></i> Apply to Device
+                                    </button>
+                                    <div class="control-feedback hidden" id="temp-feedback">
+                                        <i class="fa-solid fa-check-circle"></i>
+                                        Command sent to ESP32!
+                                    </div>
                                 </div>
-                                <p class="control-hint">Activates blue light therapy unit in incubator.</p>
-                            </div>
 
-                            <hr class="control-divider">
-
-                            <!-- Alarm Threshold -->
-                            <div class="control-group">
-                                <label for="alarm-threshold-input" class="control-label">
-                                    <i class="fa-solid fa-bell"></i>
-                                    Alarm Threshold (Temp)
-                                </label>
-                                <div class="control-input-row">
-                                    <input type="number" id="alarm-threshold-input" class="control-input" min="35"
-                                        max="42" step="0.5" value="38.5" placeholder="38.5">
-                                    <span class="control-unit">°C</span>
+                                <!-- Light therapy toggle (Jaundice) -->
+                                <div class="control-group">
+                                    <label class="control-label">
+                                        <i class="fa-solid fa-sun"></i>
+                                        Phototherapy Light
+                                    </label>
+                                    <div class="toggle-switch-row">
+                                        <span>OFF</span>
+                                        <label class="toggle-switch" for="photo-therapy-toggle"
+                                            aria-label="Phototherapy toggle">
+                                            <input type="checkbox" id="photo-therapy-toggle">
+                                            <span class="toggle-track"></span>
+                                        </label>
+                                        <span>ON</span>
+                                    </div>
+                                    <p class="control-hint">Activates blue light therapy unit in incubator.</p>
                                 </div>
-                                <button id="set-alarm-btn" class="btn btn-control btn-warning-control">
-                                    <i class="fa-solid fa-floppy-disk"></i> Set Alarm
-                                </button>
-                            </div>
+
+                                <!-- Alarm Threshold -->
+                                <div class="control-group">
+                                    <label for="alarm-threshold-input" class="control-label">
+                                        <i class="fa-solid fa-bell"></i>
+                                        Alarm Threshold (Temp)
+                                    </label>
+                                    <div class="control-input-row">
+                                        <input type="number" id="alarm-threshold-input" class="control-input" min="35"
+                                            max="42" step="0.5" value="38.5" placeholder="38.5">
+                                        <span class="control-unit">°C</span>
+                                    </div>
+                                    <button id="set-alarm-btn" class="btn btn-control btn-warning-control">
+                                        <i class="fa-solid fa-floppy-disk"></i> Set Alarm
+                                    </button>
+                                </div>
+
+                                <!-- Delete Incubator -->
+                                <div class="control-group">
+                                    <button id="delete-incubator-btn" class="btn btn-danger btn-full">
+                                        <i class="fa-solid fa-trash"></i> Delete Incubator
+                                    </button>
+                                </div>
+
+                            </div><!-- /controls-body -->
 
                         </div>
                         <!-- /controls-panel -->

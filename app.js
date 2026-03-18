@@ -32,6 +32,75 @@ let ecgChartParent = null;       // Chart.js instance (Parent)
 let ecgBuffer = [];         // Rolling ECG values
 const ECG_BUFFER_SIZE = 80;
 
+const deviceLastSeen = {};
+const previousSensorData = {};
+const isInitialLoad = {};
+
+setInterval(() => {
+    const now = Date.now();
+    document.querySelectorAll('.sidebar-item').forEach(item => {
+        const id = item.dataset.id;
+        if (!id) return;
+
+        const age = now - (deviceLastSeen[id] || 0);
+        const dot = item.querySelector('.sidebar-item-online');
+
+        if (age > 5000) {
+            // OFFLINE
+            if (dot) dot.classList.remove('is-online');
+
+            // CRITICAL: If selected, force dashboard offline
+            if (id === selectedIncubatorId) {
+                const statusBadge = $('patient-status-badge');
+                if (statusBadge && !statusBadge.classList.contains('status-offline')) {
+                    statusBadge.classList.add('status-offline');
+                    statusBadge.innerHTML = '<i class="fa-solid fa-link-slash"></i><span>Device Offline</span>';
+                }
+                const ecgBadge = $('ecg-live-badge');
+                if (ecgBadge && !ecgBadge.classList.contains('status-offline')) {
+                    ecgBadge.classList.add('status-offline');
+                    ecgBadge.innerHTML = '<i class="fa-solid fa-circle"></i> Offline';
+                }
+                const text = $('last-updated-text');
+                if (text) text.textContent = 'No data \u2014 device offline';
+                const badge = $('last-updated-badge');
+                if (badge && !badge.classList.contains('stale')) {
+                    badge.classList.remove('fresh');
+                    badge.classList.add('stale');
+                }
+
+                ['temp-val', 'hum-val', 'hr-val', 'jaundice-val'].forEach(elId => {
+                    const el = $(elId); if (el) el.textContent = '--';
+                });
+                ['temp-progress', 'hum-progress', 'hr-progress'].forEach(elId => {
+                    const el = $(elId); if (el) el.style.width = '0%';
+                });
+
+                if (ecgChart && ecgChart.data.datasets[0].data.some(v => v !== 0)) {
+                    ecgChart.data.datasets[0].data.fill(0);
+                    ecgChart.update('none');
+                }
+            }
+        } else {
+            // ONLINE
+            if (dot) dot.classList.add('is-online');
+
+            if (id === selectedIncubatorId) {
+                const statusBadge = $('patient-status-badge');
+                if (statusBadge && statusBadge.classList.contains('status-offline')) {
+                    statusBadge.classList.remove('status-offline');
+                    statusBadge.innerHTML = '<i class="fa-solid fa-circle-check"></i><span>Live Monitoring</span>';
+                }
+                const ecgBadge = $('ecg-live-badge');
+                if (ecgBadge && ecgBadge.classList.contains('status-offline')) {
+                    ecgBadge.classList.remove('status-offline');
+                    ecgBadge.innerHTML = '<i class="fa-solid fa-circle"></i> Live';
+                }
+            }
+        }
+    });
+}, 1000);
+
 // ----------------------------------------------------------------
 // 3. UTILITY HELPERS
 // ----------------------------------------------------------------
@@ -386,6 +455,38 @@ function listenToIncubatorList() {
     const handler = ref.on('value', (snap) => {
         const data = snap.val() || {};
         renderIncubatorList(data);
+
+        const now = Date.now();
+        Object.keys(data).forEach(id => {
+            const inc = data[id];
+            if (inc && inc.sensors) {
+                const currentSensorsStr = JSON.stringify(inc.sensors);
+
+                if (isInitialLoad[id] === undefined) {
+                    isInitialLoad[id] = false;
+                    previousSensorData[id] = currentSensorsStr;
+                    return; // Ignore initial cache for watchdog
+                }
+
+                if (previousSensorData[id] !== currentSensorsStr) {
+                    previousSensorData[id] = currentSensorsStr;
+                    deviceLastSeen[id] = now;
+
+                    if (selectedIncubatorId === id) {
+                        const isParent = currentUserRole === 'parent';
+                        updateSensorUI(inc.sensors, isParent);
+                        if (inc.sensors.ecg !== null && inc.sensors.ecg !== undefined) {
+                            const ecgVal = parseFloat(inc.sensors.ecg);
+                            if (!isNaN(ecgVal)) {
+                                if (ecgChart) pushECGSample(ecgChart, ecgVal);
+                                if (ecgChartParent) pushECGSample(ecgChartParent, ecgVal);
+                            }
+                        }
+                        updateLastUpdated();
+                    }
+                }
+            }
+        });
     });
     activeListeners.push(() => ref.off('value', handler));
 }
@@ -410,6 +511,7 @@ function renderIncubatorList(data) {
 
     keys.forEach(key => {
         const inc = data[key];
+        const isOnline = inc?.status?.online === true;
         const item = document.createElement('div');
         item.className = 'sidebar-item' + (key === selectedIncubatorId ? ' active' : '');
         item.setAttribute('role', 'listitem');
@@ -420,13 +522,12 @@ function renderIncubatorList(data) {
             </div>
             <div class="sidebar-item-info">
                 <div class="sidebar-item-name">${escapeHtml(inc.babyName || 'Unnamed')}</div>
-                <div class="sidebar-item-sub">${escapeHtml(inc.parentName || '—')}</div>
+                <div class="sidebar-item-sub">${escapeHtml(inc.parentName || '\u2014')}</div>
             </div>
             <div class="sidebar-item-online"></div>`;
 
         item.addEventListener('click', () => {
             selectIncubator(key, inc);
-            // Close sidebar on mobile
             $('doctor-sidebar')?.classList.remove('open');
         });
 
@@ -445,6 +546,46 @@ function escapeHtml(str) {
 // ----------------------------------------------------------------
 // 13. SELECT AN INCUBATOR
 // ----------------------------------------------------------------
+
+/** Helper: reset all badge + sensor fields to a neutral "Connecting…" state.
+ *  The Firebase presence listener is the authoritative source of truth
+ *  and will immediately update these to Live or Offline on first reply. */
+function resetDashboardUI() {
+    clearTimeout(lastUpdateTimer);
+
+    // Last-updated badge → neutral
+    const badge = $('last-updated-badge');
+    const text = $('last-updated-text');
+    if (badge) badge.classList.remove('fresh', 'stale');
+    if (text) text.textContent = 'Connecting...';
+
+    // Patient status badge → "Connecting" spinner (neutral, no red)
+    const statusBadge = $('patient-status-badge');
+    if (statusBadge) {
+        statusBadge.classList.remove('status-offline');
+        statusBadge.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i><span>Connecting...</span>';
+    }
+
+    // ECG badge → neutral connecting
+    const ecgBadge = $('ecg-live-badge');
+    if (ecgBadge) {
+        ecgBadge.classList.remove('status-offline');
+        ecgBadge.innerHTML = '<i class="fa-solid fa-circle"></i> Connecting';
+    }
+
+    // All sensor values → --
+    ['temp-val', 'hum-val', 'hr-val', 'jaundice-val'].forEach(id => {
+        const el = $(id);
+        if (el) el.textContent = '--';
+    });
+    ['temp-progress', 'hum-progress', 'hr-progress'].forEach(id => {
+        const el = $(id);
+        if (el) el.style.width = '0%';
+    });
+}
+
+/** Removed setSidebarDotOffline globally */
+
 function selectIncubator(id, data) {
     selectedIncubatorId = id;
 
@@ -455,8 +596,7 @@ function selectIncubator(id, data) {
 
     // Show the dashboard panel
     $('no-incubator-selected')?.classList.add('hidden');
-    const dashboard = $('incubator-dashboard');
-    dashboard?.classList.remove('hidden');
+    $('incubator-dashboard')?.classList.remove('hidden');
 
     // Populate patient header
     $('dashboard-baby-name').textContent = data.babyName || 'Unknown';
@@ -464,9 +604,42 @@ function selectIncubator(id, data) {
     $('dashboard-child-code').textContent = data.childCode || '—';
     $('dashboard-device-id').textContent = data.deviceId || '—';
 
-    // Clear old sensor listeners and start new ones
-    clearSensorListeners();
-    listenToSensorData(id);
+    // Set UI to "Connecting…", clear ECG waveform
+    if (typeof hideAlert === 'function') hideAlert('alert-banner');
+    resetDashboardUI();
+    if (ecgChart) {
+        ecgChart.data.datasets[0].data = Array(ECG_BUFFER_SIZE).fill(0);
+        ecgChart.update('none');
+    }
+
+    // Initial Selection Logic - OFFLINE check
+    const age = Date.now() - (deviceLastSeen[id] || 0);
+    if (age > 5000) {
+        const statusBadge = $('patient-status-badge');
+        if (statusBadge) {
+            statusBadge.classList.add('status-offline');
+            statusBadge.innerHTML = '<i class="fa-solid fa-link-slash"></i><span>Device Offline</span>';
+        }
+        const ecgBadge = $('ecg-live-badge');
+        if (ecgBadge) {
+            ecgBadge.classList.add('status-offline');
+            ecgBadge.innerHTML = '<i class="fa-solid fa-circle"></i> Offline';
+        }
+        const text = $('last-updated-text');
+        if (text) text.textContent = 'No data \u2014 device offline';
+        const badge = $('last-updated-badge');
+        if (badge) {
+            badge.classList.remove('fresh');
+            badge.classList.add('stale');
+        }
+
+        ['temp-val', 'hum-val', 'hr-val', 'jaundice-val'].forEach(elId => {
+            const el = $(elId); if (el) el.textContent = '--';
+        });
+        ['temp-progress', 'hum-progress', 'hr-progress'].forEach(elId => {
+            const el = $(elId); if (el) el.style.width = '0%';
+        });
+    }
 
     // Restore controls
     if (data.controls) {
@@ -487,40 +660,9 @@ function selectIncubator(id, data) {
 // ----------------------------------------------------------------
 // 14. REALTIME SENSOR DATA LISTENER
 // ----------------------------------------------------------------
-let sensorListeners = [];
-
-function clearSensorListeners() {
-    sensorListeners.forEach(off => off());
-    sensorListeners = [];
-    hideAlert('alert-banner');
-}
-
-function listenToSensorData(incubatorId) {
-    const sensorRef = db.ref(`Incubators/${incubatorId}/sensors`);
-
-    const handler = sensorRef.on('value', (snap) => {
-        const data = snap.val();
-        if (!data) return;
-
-        // Update temperature, humidity, heart rate, jaundice UI
-        updateSensorUI(data, false);
-
-        // Update ECG chart ONLY from Firebase — no mock data
-        if (data.ecg !== null && data.ecg !== undefined) {
-            const ecgVal = parseFloat(data.ecg);
-            if (!isNaN(ecgVal)) {
-                pushECGSample(ecgChart, ecgVal);
-                pushECGSample(ecgChartParent, ecgVal);
-            }
-        }
-
-        updateLastUpdated(); // stamp data freshness
-    });
-
-    sensorListeners.push(() => sensorRef.off('value', handler));
-    // Register with global listeners too so logout clears them
-    activeListeners.push(() => sensorRef.off('value', handler));
-}
+// ----------------------------------------------------------------
+// 14. REALTIME SENSOR DATA (Handled Globally)
+// ----------------------------------------------------------------
 
 function updateSensorUI(data, isParent) {
     const prefix = isParent ? 'p-' : '';
@@ -606,13 +748,12 @@ function updateLastUpdated() {
     badge.classList.remove('stale');
     badge.classList.add('fresh');
 
-    // After 30 seconds without a new update, mark as stale
+    // After 5 seconds without a new update → Device Offline
     clearTimeout(lastUpdateTimer);
     lastUpdateTimer = setTimeout(() => {
         badge.classList.remove('fresh');
         badge.classList.add('stale');
-        if (text) text.textContent = 'No data for 30s — check device';
-    }, 30000);
+    }, 5000);
 }
 
 
@@ -761,7 +902,7 @@ $('add-incubator-form')?.addEventListener('submit', async (e) => {
         const childCode = generateChildCode();
         const password = generatePassword();
 
-        const newRef = db.ref('Incubators').push();
+        const newRef = db.ref(`Incubators/${deviceId}`);
         await newRef.set({
             deviceId,
             babyName,
@@ -890,6 +1031,30 @@ $('set-alarm-btn')?.addEventListener('click', async () => {
 });
 
 // ----------------------------------------------------------------
+// 21b. DOCTOR CONTROLS — DELETE INCUBATOR
+// ----------------------------------------------------------------
+$('delete-incubator-btn')?.addEventListener('click', async () => {
+    if (!selectedIncubatorId) return;
+    const confirmed = confirm(
+        'Are you sure you want to delete this incubator and all its data? This action cannot be undone.'
+    );
+    if (!confirmed) return;
+
+    try {
+        await db.ref('Incubators/' + selectedIncubatorId).remove();
+        // Reset UI
+        clearSensorListeners();
+        clearTimeout(lastUpdateTimer);
+        selectedIncubatorId = null;
+        $('incubator-dashboard')?.classList.add('hidden');
+        $('no-incubator-selected')?.classList.remove('hidden');
+    } catch (err) {
+        console.error('Delete incubator error:', err);
+        alert('Failed to delete incubator. Please try again.');
+    }
+});
+
+// ----------------------------------------------------------------
 // 22. PARENT DASHBOARD INITIALIZATION
 // ----------------------------------------------------------------
 function initParentDashboard(user, profile) {
@@ -988,9 +1153,6 @@ function showParentMonitor(incubatorId, data) {
     db.ref('.info/connected').on('value', (snap) => {
         console.log('Firebase connection (parent):', snap.val() === true ? 'online' : 'offline');
     });
-
-    // Start ECG simulation for parent too
-    startECGSimulation(incubatorId);
 }
 
 // ----------------------------------------------------------------
