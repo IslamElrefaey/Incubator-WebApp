@@ -19,6 +19,12 @@
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+
+    <!-- Flatpickr -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/themes/material_blue.css">
+    <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
     <!-- Firebase SDK (v10 Modular via CDN compat) -->
     <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
@@ -299,14 +305,19 @@
                             </div>
                         </div>
                         <div class="patient-meta">
-                            <div class="last-updated-badge" id="last-updated-badge">
-                                <i class="fa-solid fa-satellite-dish"></i>
-                                <span id="last-updated-text">Waiting for data...</span>
+                            <div class="status-badges-col">
+                                <div class="last-updated-badge" id="last-updated-badge">
+                                    <i class="fa-solid fa-satellite-dish"></i>
+                                    <span id="last-updated-text">Waiting for data...</span>
+                                </div>
+                                <div class="patient-status-badge" id="patient-status-badge">
+                                    <i class="fa-solid fa-circle-check"></i>
+                                    <span>Live Monitoring</span>
+                                </div>
                             </div>
-                            <div class="patient-status-badge" id="patient-status-badge">
-                                <i class="fa-solid fa-circle-check"></i>
-                                <span>Live Monitoring</span>
-                            </div>
+                            <button id="open-history-btn" class="btn-icon-circular history-btn" aria-label="View History" title="View Historical Data" onclick="fetchHistoryAndRender(selectedIncubatorId)">
+                                <i class="fa-solid fa-clock-rotate-left"></i>
+                            </button>
                         </div>
                     </div>
 
@@ -770,6 +781,23 @@
                         <input type="text" id="new-parent-name" placeholder="e.g. Mr. & Mrs. Hassan" required>
                     </div>
 
+                    <div class="form-group">
+                        <label>
+                            <i class="fa-solid fa-venus-mars"></i> Baby's Gender
+                        </label>
+                        <div class="gender-selector">
+                            <button type="button" class="gender-btn" data-gender="boy">
+                                <i class="fa-solid fa-baby"></i>
+                                <span>Boy</span>
+                            </button>
+                            <button type="button" class="gender-btn" data-gender="girl">
+                                <i class="fa-solid fa-baby"></i>
+                                <span>Girl</span>
+                            </button>
+                        </div>
+                        <input type="hidden" id="new-baby-gender" required>
+                    </div>
+
                     <!-- Auto-Generated Fields Preview -->
                     <div class="auto-gen-preview" id="auto-gen-preview">
                         <div class="auto-gen-info">
@@ -796,6 +824,86 @@
     </div>
     <!-- /add-incubator-modal -->
 
+
+    <!-- ============================================================
+         MODAL: Historical Data
+    ============================================================ -->
+    <div id="history-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="history-title">
+        <div class="modal-box modal-box-large history-modal-box">
+            <div class="modal-header">
+                <h2 id="history-title">
+                    <i class="fa-solid fa-clock-rotate-left"></i> Patient Historical Data
+                </h2>
+                <button class="modal-close-btn" id="history-close-btn" aria-label="Close modal" onclick="document.getElementById('history-modal').classList.add('hidden')">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+
+            <div class="modal-body history-body">
+                <!-- Time Filter Toolbar -->
+                <div class="history-toolbar">
+                    <div class="time-filters">
+                        <button class="btn btn-filter active" onclick="applyHistoryFilter('1H')">Last 1H</button>
+                        <button class="btn btn-filter" onclick="applyHistoryFilter('24H')">Last 24H</button>
+                        <button class="btn btn-filter" onclick="applyHistoryFilter('7D')">Last 7 Days</button>
+                        <button class="btn btn-filter" onclick="applyHistoryFilter('30D')">Last 30 Days</button>
+                        <button class="btn btn-filter" onclick="applyHistoryFilter('ALL')">All Time</button>
+                    </div>
+                    <div class="custom-range" id="history-custom-range">
+                        <div class="datetime-wrapper" id="history-start-wrapper">
+                            <i class="fa-solid fa-calendar-day"></i>
+                            <input type="text" class="datetime-picker" id="history-start" placeholder="Start Date & Time">
+                        </div>
+                        <span>to</span>
+                        <div class="datetime-wrapper" id="history-end-wrapper">
+                            <i class="fa-solid fa-calendar-day"></i>
+                            <input type="text" class="datetime-picker" id="history-end" placeholder="End Date & Time">
+                        </div>
+                        <button class="btn btn-filter" onclick="applyHistoryFilter('CUSTOM')">Apply</button>
+                    </div>
+                </div>
+
+                <!-- Charts Container Grid -->
+                <div class="history-charts-grid" id="history-charts-container">
+                    <!-- Placeholder Loading/Empty States -->
+                    <div id="history-loading" class="history-state hidden">
+                        <i class="fa-solid fa-circle-notch fa-spin"></i>
+                        <p>Loading historical data...</p>
+                        <div class="history-progress">
+                            <div id="history-progress-bar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    
+                    <div id="history-empty" class="history-state hidden">
+                        <i class="fa-solid fa-inbox"></i>
+                        <p>No historical data available for this period.</p>
+                    </div>
+
+                    <!-- 5 Charts -->
+                    <div class="history-chart-card">
+                        <span class="chart-title"><i class="fa-solid fa-temperature-half" style="color: var(--temp-color)"></i> Temperature</span>
+                        <div class="history-canvas-wrapper"><canvas id="historyTempChart"></canvas></div>
+                    </div>
+                    <div class="history-chart-card">
+                        <span class="chart-title"><i class="fa-solid fa-droplet" style="color: var(--hum-color)"></i> Humidity</span>
+                        <div class="history-canvas-wrapper"><canvas id="historyHumChart"></canvas></div>
+                    </div>
+                    <div class="history-chart-card">
+                        <span class="chart-title"><i class="fa-solid fa-heart-pulse" style="color: var(--hr-color)"></i> Heart Rate</span>
+                        <div class="history-canvas-wrapper"><canvas id="historyHRChart"></canvas></div>
+                    </div>
+                    <div class="history-chart-card">
+                        <span class="chart-title"><i class="fa-solid fa-eye" style="color: var(--jaundice-color)"></i> Jaundice (Bilirubin)</span>
+                        <div class="history-canvas-wrapper"><canvas id="historyJaundiceChart"></canvas></div>
+                    </div>
+                    <div class="history-chart-card history-chart-full">
+                        <span class="chart-title"><i class="fa-solid fa-wave-square" style="color: var(--brand-primary)"></i> ECG</span>
+                        <div class="history-canvas-wrapper"><canvas id="historyEcgChart"></canvas></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 
     <!-- ============================================================
          MODAL: Incubator Credentials (shown after successful creation)

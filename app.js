@@ -26,6 +26,7 @@ const db = firebase.database();
 let currentUser = null;       // Firebase user object
 let currentUserRole = null;       // 'doctor' | 'parent'
 let selectedIncubatorId = null;       // Active Firebase incubator key
+let currentDashboardState = null;
 let activeListeners = [];         // Firebase listener unsubscribe refs
 let ecgChart = null;       // Chart.js instance (Doctor)
 let ecgChartParent = null;       // Chart.js instance (Parent)
@@ -34,6 +35,7 @@ const ECG_BUFFER_SIZE = 80;
 
 const deviceLastSeen = {};
 const previousSensorData = {};
+const previousLastUpdate = {};
 const isInitialLoad = {};
 
 setInterval(() => {
@@ -47,24 +49,24 @@ setInterval(() => {
 
         if (age > 5000) {
             // OFFLINE
-            if (dot) dot.classList.remove('is-online');
 
             // CRITICAL: If selected, force dashboard offline
-            if (id === selectedIncubatorId) {
+            if (id === selectedIncubatorId && currentDashboardState !== 'offline') {
+                currentDashboardState = 'offline';
                 const statusBadge = $('patient-status-badge');
-                if (statusBadge && !statusBadge.classList.contains('status-offline')) {
+                if (statusBadge) {
                     statusBadge.classList.add('status-offline');
                     statusBadge.innerHTML = '<i class="fa-solid fa-link-slash"></i><span>Device Offline</span>';
                 }
                 const ecgBadge = $('ecg-live-badge');
-                if (ecgBadge && !ecgBadge.classList.contains('status-offline')) {
+                if (ecgBadge) {
                     ecgBadge.classList.add('status-offline');
-                    ecgBadge.innerHTML = '<i class="fa-solid fa-circle"></i> Offline';
+                    ecgBadge.innerHTML = '<i class="fa-solid fa-circle"></i> OFFLINE';
                 }
                 const text = $('last-updated-text');
                 if (text) text.textContent = 'No data \u2014 device offline';
                 const badge = $('last-updated-badge');
-                if (badge && !badge.classList.contains('stale')) {
+                if (badge) {
                     badge.classList.remove('fresh');
                     badge.classList.add('stale');
                 }
@@ -83,18 +85,28 @@ setInterval(() => {
             }
         } else {
             // ONLINE
-            if (dot) dot.classList.add('is-online');
 
-            if (id === selectedIncubatorId) {
+            if (id === selectedIncubatorId && currentDashboardState !== 'online') {
+                currentDashboardState = 'online';
                 const statusBadge = $('patient-status-badge');
-                if (statusBadge && statusBadge.classList.contains('status-offline')) {
+                if (statusBadge) {
                     statusBadge.classList.remove('status-offline');
                     statusBadge.innerHTML = '<i class="fa-solid fa-circle-check"></i><span>Live Monitoring</span>';
                 }
                 const ecgBadge = $('ecg-live-badge');
-                if (ecgBadge && ecgBadge.classList.contains('status-offline')) {
+                if (ecgBadge) {
                     ecgBadge.classList.remove('status-offline');
-                    ecgBadge.innerHTML = '<i class="fa-solid fa-circle"></i> Live';
+                    ecgBadge.innerHTML = '<i class="fa-solid fa-circle"></i> LIVE';
+                }
+                
+                // Force UI Sync on Reconnection
+                if (previousSensorData[id]) {
+                    try {
+                        const data = JSON.parse(previousSensorData[id]);
+                        const isParent = currentUserRole === 'parent';
+                        updateSensorUI(data, isParent);
+                        updateLastUpdated();
+                    } catch (e) {}
                 }
             }
         }
@@ -460,21 +472,20 @@ function listenToIncubatorList() {
         Object.keys(data).forEach(id => {
             const inc = data[id];
             if (inc && inc.sensors) {
-                const currentSensorsStr = JSON.stringify(inc.sensors);
-
-                if (isInitialLoad[id] === undefined) {
-                    isInitialLoad[id] = false;
-                    previousSensorData[id] = currentSensorsStr;
-                    return; // Ignore initial cache for watchdog
-                }
-
-                if (previousSensorData[id] !== currentSensorsStr) {
-                    previousSensorData[id] = currentSensorsStr;
-                    deviceLastSeen[id] = now;
-
+                const incomingTimestamp = inc.sensors.lastUpdate;
+                
+                // Only mark as "seen now" if the timestamp is actually new/different
+                if (incomingTimestamp && incomingTimestamp !== previousLastUpdate[id]) {
+                    deviceLastSeen[id] = Date.now();
+                    previousLastUpdate[id] = incomingTimestamp;
+                    
+                    // If this is the active incubator, update UI immediately
                     if (selectedIncubatorId === id) {
                         const isParent = currentUserRole === 'parent';
                         updateSensorUI(inc.sensors, isParent);
+                        updateLastUpdated();
+                        
+                        // ECG
                         if (inc.sensors.ecg !== null && inc.sensors.ecg !== undefined) {
                             const ecgVal = parseFloat(inc.sensors.ecg);
                             if (!isNaN(ecgVal)) {
@@ -482,9 +493,10 @@ function listenToIncubatorList() {
                                 if (ecgChartParent) pushECGSample(ecgChartParent, ecgVal);
                             }
                         }
-                        updateLastUpdated();
                     }
                 }
+                // Sync the raw string for recovery purposes
+                previousSensorData[id] = JSON.stringify(inc.sensors);
             }
         });
     });
@@ -516,8 +528,11 @@ function renderIncubatorList(data) {
         item.className = 'sidebar-item' + (key === selectedIncubatorId ? ' active' : '');
         item.setAttribute('role', 'listitem');
         item.setAttribute('data-id', key);
+        
+        const genderClass = inc.gender === 'girl' ? 'gender-girl-icon' : (inc.gender === 'boy' ? 'gender-boy-icon' : '');
+        
         item.innerHTML = `
-            <div class="sidebar-item-avatar">
+            <div class="sidebar-item-avatar ${genderClass}">
                 <i class="fa-solid fa-baby"></i>
             </div>
             <div class="sidebar-item-info">
@@ -604,9 +619,18 @@ function selectIncubator(id, data) {
     $('dashboard-child-code').textContent = data.childCode || '—';
     $('dashboard-device-id').textContent = data.deviceId || '—';
 
+    // Apply gender class to patient-avatar
+    const avatar = document.querySelector('#incubator-dashboard .patient-avatar');
+    if (avatar) {
+        avatar.className = 'patient-avatar'; // reset
+        if (data.gender === 'girl') avatar.classList.add('gender-girl-icon');
+        else if (data.gender === 'boy') avatar.classList.add('gender-boy-icon');
+    }
+
     // Set UI to "Connecting…", clear ECG waveform
     if (typeof hideAlert === 'function') hideAlert('alert-banner');
     resetDashboardUI();
+    currentDashboardState = 'connecting';
     if (ecgChart) {
         ecgChart.data.datasets[0].data = Array(ECG_BUFFER_SIZE).fill(0);
         ecgChart.update('none');
@@ -664,6 +688,16 @@ function selectIncubator(id, data) {
 // 14. REALTIME SENSOR DATA (Handled Globally)
 // ----------------------------------------------------------------
 
+const BILIRUBIN_SLOPE = 15.0; 
+const BILIRUBIN_OFFSET = 0.5;
+
+function calculateBilirubin(r, g, b) {
+    const safeB = b === 0 ? 1 : b;
+    const safeG = g === 0 ? 1 : g;
+    const bi = Math.log10(255 / safeB) - Math.log10(255 / safeG);
+    return (bi * BILIRUBIN_SLOPE) + BILIRUBIN_OFFSET;
+}
+
 function updateSensorUI(data, isParent) {
     const prefix = isParent ? 'p-' : '';
 
@@ -698,7 +732,10 @@ function updateSensorUI(data, isParent) {
     }
 
     // Jaundice
-    if (data.jaundice !== undefined) {
+    if (data.r !== undefined && data.g !== undefined && data.b !== undefined) {
+        const bilirubin = calculateBilirubin(data.r, data.g, data.b);
+        updateJaundiceUI(bilirubin, isParent);
+    } else if (data.jaundice !== undefined) {
         updateJaundiceUI(data.jaundice, isParent);
     }
 }
@@ -709,19 +746,31 @@ function updateJaundiceUI(level, isParent) {
     const indEl = isParent ? $('p-jaundice-indicator') : $('jaundice-indicator');
     const dotEl = indEl?.querySelector('.jaundice-dot');
     const textEl = $(`${prefix}jaundice-level-text`);
-    const levelStr = String(level).toLowerCase();
 
-    let label, dotClass, color;
+    let label, dotClass, color, displayVal;
 
-    if (levelStr === 'low' || levelStr === '0') {
-        label = 'Low'; dotClass = ''; color = 'var(--color-success)';
-    } else if (levelStr === 'medium' || levelStr === '1') {
-        label = 'Medium'; dotClass = 'medium'; color = 'var(--color-warning)';
+    if (typeof level === 'number') {
+        displayVal = level.toFixed(1) + ' mg/dL';
+        if (level < 5.0) {
+            label = 'Low'; dotClass = ''; color = 'var(--color-success)';
+        } else if (level <= 15.0) {
+            label = 'Medium'; dotClass = 'medium'; color = 'var(--color-warning)';
+        } else {
+            label = 'High'; dotClass = 'high'; color = 'var(--color-danger)';
+        }
     } else {
-        label = 'High'; dotClass = 'high'; color = 'var(--color-danger)';
+        const levelStr = String(level).toLowerCase();
+        if (levelStr === 'low' || levelStr === '0') {
+            label = 'Low'; dotClass = ''; color = 'var(--color-success)';
+        } else if (levelStr === 'medium' || levelStr === '1') {
+            label = 'Medium'; dotClass = 'medium'; color = 'var(--color-warning)';
+        } else {
+            label = 'High'; dotClass = 'high'; color = 'var(--color-danger)';
+        }
+        displayVal = label;
     }
 
-    if (valEl) { valEl.textContent = label; valEl.style.color = color; }
+    if (valEl) { valEl.textContent = displayVal; valEl.style.color = color; }
     if (dotEl) { dotEl.className = 'jaundice-dot ' + dotClass; }
     if (textEl) textEl.textContent = label === 'High' ? '⚠ Elevated bilirubin' :
         label === 'Medium' ? 'Mild jaundice detected' :
@@ -748,12 +797,12 @@ function updateLastUpdated() {
     badge.classList.remove('stale');
     badge.classList.add('fresh');
 
-    // After 5 seconds without a new update → Device Offline
+    // After 2.5 seconds without a new update → Device Stale
     clearTimeout(lastUpdateTimer);
     lastUpdateTimer = setTimeout(() => {
         badge.classList.remove('fresh');
         badge.classList.add('stale');
-    }, 5000);
+    }, 2500);
 }
 
 
@@ -882,6 +931,17 @@ $('add-incubator-modal')?.addEventListener('click', (e) => {
     if (e.target === $('add-incubator-modal')) closeAddModal();
 });
 
+// Gender selection logic
+document.querySelectorAll('.gender-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+        document.querySelectorAll('.gender-btn').forEach(b => b.classList.remove('active'));
+        const targetBtn = e.currentTarget;
+        targetBtn.classList.add('active');
+        const genderInput = $('new-baby-gender');
+        if (genderInput) genderInput.value = targetBtn.dataset.gender;
+    });
+});
+
 $('add-incubator-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     clearError('add-incubator-error');
@@ -889,10 +949,12 @@ $('add-incubator-form')?.addEventListener('submit', async (e) => {
     const deviceId = $('esp-device-id')?.value.trim();
     const babyName = $('new-baby-name')?.value.trim();
     const parentName = $('new-parent-name')?.value.trim();
+    const gender = $('new-baby-gender')?.value;
 
     if (!deviceId) return showError('add-incubator-error', 'Please enter the ESP32 Device ID.');
     if (!babyName) return showError('add-incubator-error', "Please enter the baby's name.");
     if (!parentName) return showError('add-incubator-error', "Please enter the parent's name.");
+    if (!gender) return showError('add-incubator-error', 'Please select the baby\'s gender (Boy/Girl).');
 
     const submitBtn = $('add-incubator-submit-btn');
     submitBtn.disabled = true;
@@ -907,6 +969,7 @@ $('add-incubator-form')?.addEventListener('submit', async (e) => {
             deviceId,
             babyName,
             parentName,
+            gender,
             childCode,
             password,
             createdAt: Date.now(),
@@ -1141,6 +1204,14 @@ function showParentMonitor(incubatorId, data) {
 
     $('parent-baby-name').textContent = data.babyName || 'Your Baby';
 
+    // Apply gender class to patient-avatar
+    const avatar = document.querySelector('#parent-dashboard .patient-avatar');
+    if (avatar) {
+        avatar.className = 'patient-avatar'; // reset
+        if (data.gender === 'girl') avatar.classList.add('gender-girl-icon');
+        else if (data.gender === 'boy') avatar.classList.add('gender-boy-icon');
+    }
+
     // Listen to realtime sensor data for this incubator
     const sensorRef = db.ref(`Incubators/${incubatorId}/sensors`);
     const handler = sensorRef.on('value', (snap) => {
@@ -1169,9 +1240,223 @@ function updateConnectionBadge(id, online) {
 // ----------------------------------------------------------------
 // 25. DOM READY — BOOT AUTH UI
 // ----------------------------------------------------------------
+// Flatpickr global initialization
+let startPicker, endPicker;
+
 document.addEventListener('DOMContentLoaded', () => {
     initAuthUI();
     // Initialize slider track fill on load
     updateSliderTrack($('target-temp-slider'));
+    
+    startPicker = flatpickr("#history-start", {
+        enableTime: true,
+        dateFormat: "Y-m-d H:i",
+        time_24hr: true
+    });
+    
+    endPicker = flatpickr("#history-end", {
+        enableTime: true,
+        dateFormat: "Y-m-d H:i",
+        time_24hr: true
+    });
 });
 
+// ----------------------------------------------------------------
+// 26. HISTORICAL DATA MODAL
+// ----------------------------------------------------------------
+let historyCharts = {};
+let targetIncubatorHistory = null;
+let currentHistoryFilter = '1H';
+
+function getJaundiceNumeric(d) {
+    if (d && d.r !== undefined && d.g !== undefined && d.b !== undefined) {
+        return calculateBilirubin(d.r, d.g, d.b);
+    }
+    const val = d ? d.jaundice : null;
+    if (val === null || val === undefined) return 0;
+    if (typeof val === 'number') return val;
+    
+    const s = String(val).toLowerCase();
+    if (s === 'low' || s === '0') return 2.0;
+    if (s === 'medium' || s === '1') return 10.0;
+    if (s === 'high' || s === '2') return 15.0;
+    return parseFloat(val) || 0;
+}
+
+function initHistoryCharts() {
+    const commonOptions = {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: false,
+        elements: {
+            line: { tension: 0, borderWidth: 2 },
+            point: { radius: 0, hitRadius: 10, hoverRadius: 4 }
+        },
+        scales: {
+            x: {
+                type: 'time',
+                time: {
+                    tooltipFormat: 'yyyy-MM-dd HH:mm:ss'
+                },
+                ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 6 }
+            },
+            y: { beginAtZero: false } // Will be customized per chart
+        },
+        plugins: { legend: { display: false } },
+        interaction: { mode: 'index', intersect: false }
+    };
+
+    const configs = [
+        { id: 'historyTempChart', color: '#f97316', key: 'temperature' },
+        { id: 'historyHumChart', color: '#3b82f6', key: 'humidity' },
+        { id: 'historyHRChart', color: '#ef4444', key: 'heartRate' },
+        { id: 'historyJaundiceChart', color: '#eab308', key: 'jaundice' },
+        { id: 'historyEcgChart', color: '#2563eb', key: 'ecg' } // ECG shouldn't have points, tension 0
+    ];
+
+    configs.forEach(conf => {
+        const ctx = $(conf.id);
+        if (!ctx) return;
+        if (historyCharts[conf.key]) {
+            historyCharts[conf.key].destroy();
+        }
+        historyCharts[conf.key] = new Chart(ctx, {
+            type: 'line',
+            data: { datasets: [{ data: [], borderColor: conf.color, backgroundColor: conf.color + '33', fill: conf.key !== 'ecg' }] },
+            options: commonOptions
+        });
+    });
+}
+
+async function fetchHistoryAndRender(incubatorId) {
+    if (!incubatorId) return;
+    targetIncubatorHistory = incubatorId;
+    
+    const modal = $('history-modal');
+    if (modal) modal.classList.remove('hidden');
+    
+    applyHistoryFilter(currentHistoryFilter);
+}
+
+async function applyHistoryFilter(filter) {
+    currentHistoryFilter = filter;
+    if (!targetIncubatorHistory) return;
+    
+    const btns = document.querySelectorAll('.history-toolbar .btn-filter');
+    btns.forEach(b => b.classList.remove('active'));
+    if (filter === '1H' && btns[0]) btns[0].classList.add('active');
+    else if (filter === '24H' && btns[1]) btns[1].classList.add('active');
+    else if (filter === '7D' && btns[2]) btns[2].classList.add('active');
+    else if (filter === '30D' && btns[3]) btns[3].classList.add('active');
+    else if (filter === 'ALL' && btns[4]) btns[4].classList.add('active');
+    else if (filter === 'CUSTOM' && btns[5]) btns[5].classList.add('active');
+    
+    const loadingEl = $('history-loading');
+    const emptyEl = $('history-empty');
+    const containerEl = $('history-charts-container');
+    
+    if (loadingEl) loadingEl.classList.remove('hidden');
+    if (emptyEl) emptyEl.classList.add('hidden');
+    if (containerEl) containerEl.style.display = 'none';
+    
+    const now = Date.now();
+    let startTime = 0;
+    let endTime = now;
+    
+    if (filter === '1H') startTime = now - 3600000;
+    else if (filter === '24H') startTime = now - 86400000;
+    else if (filter === '7D') startTime = now - 604800000;
+    else if (filter === '30D') startTime = now - 2592000000;
+    else if (filter === 'CUSTOM') {
+        const s = startPicker ? startPicker.selectedDates[0] : null;
+        const e = endPicker ? endPicker.selectedDates[0] : null;
+        if (s) startTime = s.getTime();
+        if (e) endTime = e.getTime();
+    }
+    else if (filter === 'ALL') {
+        startTime = 0;
+    }
+    
+    try {
+        let ref = db.ref(`History/${targetIncubatorHistory}`).orderByKey();
+        if (startTime > 0) {
+            ref = ref.startAt(startTime.toString());
+        }
+        if (filter === 'CUSTOM' && endTime > 0) {
+            ref = ref.endAt(endTime.toString());
+        }
+
+        const snap = await ref.once('value');
+        const rawData = snap.val();
+        
+        if (!rawData) {
+            if (loadingEl) loadingEl.classList.add('hidden');
+            if (emptyEl) emptyEl.classList.remove('hidden');
+            return;
+        }
+
+        const keys = Object.keys(rawData).sort((a,b) => Number(a) - Number(b));
+        
+        initHistoryCharts();
+        
+        let parsedData = { temperature: [], humidity: [], heartRate: [], jaundice: [], ecg: [] };
+        let lastTs = null;
+        
+        const total = keys.length;
+        let processed = 0;
+
+        for (let i = 0; i < total; i++) {
+            const ts = Number(keys[i]);
+            const d = rawData[keys[i]];
+            
+            if (lastTs !== null && (ts - lastTs) > 10000) {
+                const dropTs1 = lastTs + 1;
+                parsedData.temperature.push({ x: dropTs1, y: 0 });
+                parsedData.humidity.push({ x: dropTs1, y: 0 });
+                parsedData.heartRate.push({ x: dropTs1, y: 0 });
+                parsedData.jaundice.push({ x: dropTs1, y: 0 });
+                parsedData.ecg.push({ x: dropTs1, y: 0 });
+                
+                const dropTs2 = ts - 1;
+                parsedData.temperature.push({ x: dropTs2, y: 0 });
+                parsedData.humidity.push({ x: dropTs2, y: 0 });
+                parsedData.heartRate.push({ x: dropTs2, y: 0 });
+                parsedData.jaundice.push({ x: dropTs2, y: 0 });
+                parsedData.ecg.push({ x: dropTs2, y: 0 });
+            }
+            
+            parsedData.temperature.push({ x: ts, y: parseFloat(d.temperature) || 0 });
+            parsedData.humidity.push({ x: ts, y: parseFloat(d.humidity) || 0 });
+            parsedData.heartRate.push({ x: ts, y: parseFloat(d.heartRate) || 0 });
+            parsedData.jaundice.push({ x: ts, y: getJaundiceNumeric(d) });
+            parsedData.ecg.push({ x: ts, y: parseFloat(d.ecg) || 0 });
+            
+            lastTs = ts;
+            processed++;
+            
+            if (processed % 250 === 0) {
+                const prog = $('history-progress-bar');
+                if (prog) prog.style.width = (processed / total * 100) + '%';
+                await new Promise(resolve => setTimeout(resolve, 0));
+            }
+        }
+        
+        // [FUTURE: Insert Data Analysis / AI Predictions Here]
+
+        historyCharts['temperature'].data.datasets[0].data = parsedData.temperature;
+        historyCharts['humidity'].data.datasets[0].data = parsedData.humidity;
+        historyCharts['heartRate'].data.datasets[0].data = parsedData.heartRate;
+        historyCharts['jaundice'].data.datasets[0].data = parsedData.jaundice;
+        historyCharts['ecg'].data.datasets[0].data = parsedData.ecg;
+        
+        Object.values(historyCharts).forEach(c => c.update('none'));
+        
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (containerEl) containerEl.style.display = 'grid';
+        
+    } catch(e) {
+        console.error("Error fetching history:", e);
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (emptyEl) emptyEl.classList.remove('hidden');
+    }
+}

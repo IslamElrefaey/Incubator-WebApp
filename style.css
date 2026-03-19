@@ -1058,6 +1058,7 @@ img {
 }
 
 .sidebar-item-online {
+    display: none;
     width: 8px;
     height: 8px;
     border-radius: 50%;
@@ -1238,6 +1239,13 @@ img {
 
 /* Patient header right-side grouping */
 .patient-meta {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 16px;
+}
+
+.status-badges-col {
     display: flex;
     flex-direction: column;
     align-items: flex-end;
@@ -2470,3 +2478,431 @@ img {
         break-inside: avoid;
     }
 }
+
+/* ================================================================
+   11. HISTORICAL DATA MODAL & BUTTON
+================================================================ */
+#open-history-btn {
+    /* substantial size for prominence */
+    width: 56px;
+    height: 56px;
+
+    /* Center icon perfectly */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+
+    /* Styling */
+    background-color: var(--brand-primary);
+    /* Use primary brand color */
+    color: white;
+    /* Ensure contrast */
+    border: none;
+    border-radius: 50%;
+
+    /* Larger icon font size */
+    font-size: 24px;
+
+    /* Visual depth */
+    box-shadow: var(--shadow-md);
+    cursor: pointer;
+    transition: transform 0.2s, background-color 0.2s;
+
+    /* Prevent shrinking in flex layouts */
+    flex-shrink: 0;
+
+    /* Reset padding for perfect icon centering */
+    padding: 0;
+}
+
+#open-history-btn:hover {
+    background-color: var(--brand-primary-dark);
+    /* Defined darker primary defined elsewhere */
+    transform: scale(1.05);
+    /* Subtle grow on hover */
+}
+
+.history-modal-box {
+    width: 95vw;
+    max-width: 1400px;
+    height: 90vh;
+    display: flex;
+    flex-direction: column;
+}
+
+.history-body {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    padding: 20px;
+    gap: 20px;
+    background: var(--bg-app);
+}
+
+.history-toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-surface);
+    padding: 16px;
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.time-filters {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.btn-filter {
+    background: var(--bg-surface-2);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-color);
+    padding: 8px 16px;
+    border-radius: var(--radius-full);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.btn-filter:hover,
+.btn-filter.active {
+    background: var(--brand-primary);
+    color: #fff;
+    border-color: var(--brand-primary);
+}
+
+.btn-filter.active {
+    box-shadow: 0 2px 8px rgba(37, 99, 235, .3);
+}
+
+.custom-range {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 13px;
+    color: var(--text-secondary);
+    flex-wrap: wrap;
+}
+
+.input-sm {
+    padding: 6px 10px;
+    font-size: 13px;
+    border-radius: var(--radius-sm);
+    min-width: 140px;
+    border: 1px solid var(--border-color);
+}
+
+.history-charts-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+    flex: 1;
+}
+
+.history-chart-card {
+    background: var(--bg-surface);
+    border-radius: var(--radius-md);
+    padding: 16px;
+    box-shadow: var(--shadow-sm);
+    display: flex;
+    flex-direction: column;
+    min-height: 280px;
+}
+
+.history-chart-full {
+    grid-column: 1 / -1;
+    min-height: 350px;
+}
+
+.chart-title {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.history-canvas-wrapper {
+    flex: 1;
+    position: relative;
+    width: 100%;
+    min-height: 200px;
+}
+
+.history-state {
+    grid-column: 1 / -1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 60px 20px;
+    background: var(--bg-surface);
+    border-radius: var(--radius-md);
+    color: var(--text-secondary);
+    text-align: center;
+}
+
+.history-state i {
+    font-size: 32px;
+    margin-bottom: 16px;
+    color: var(--brand-primary);
+}
+
+.history-progress {
+    width: 100%;
+    max-width: 300px;
+    height: 6px;
+    background: var(--bg-surface-2);
+    border-radius: var(--radius-full);
+    margin-top: 16px;
+    overflow: hidden;
+}
+
+#history-progress-bar {
+    height: 100%;
+    background: var(--brand-primary);
+    transition: width 0.2s linear;
+}
+
+@media (max-width: 1024px) {
+    .history-charts-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.datetime-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+}
+
+.datetime-wrapper i {
+    position: absolute;
+    left: 12px;
+    color: var(--text-muted);
+    font-size: 14px;
+    pointer-events: none;
+    transition: var(--transition);
+}
+
+.datetime-picker {
+    background: var(--bg-surface);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    padding: 8px 12px 8px 36px;
+    font-size: 13px;
+    width: 170px;
+    outline: none;
+    transition: var(--transition);
+}
+
+.datetime-picker:focus,
+.datetime-picker:active {
+    border-color: var(--brand-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, .12);
+}
+
+.datetime-wrapper:focus-within i {
+    color: var(--brand-primary);
+}
+
+/* ================================================================
+   FLATPICKR - ABSOLUTE OVERRIDE (LIGHT & DARK MODES PERFECTED)
+   ================================================================ */
+
+/* 1. Main Container & Reset (Dark Mode) */
+html[data-theme="dark"] .flatpickr-calendar {
+    background: var(--bg-surface) !important;
+    border: 1px solid var(--border-color) !important;
+    box-shadow: var(--shadow-modal) !important;
+}
+
+html[data-theme="dark"] .flatpickr-calendar * {
+    box-shadow: none !important;
+}
+
+/* 2. UNIFIED BLUE HEADER (BOTH Light & Dark Modes) */
+.flatpickr-calendar .flatpickr-months,
+.flatpickr-calendar .flatpickr-month,
+.flatpickr-calendar .flatpickr-weekdays,
+.flatpickr-calendar .flatpickr-weekdaycontainer {
+    background: var(--brand-secondary) !important;
+    border: none !important;
+}
+
+/* 3. Header Text & Arrows (BOTH Light & Dark Modes) */
+.flatpickr-calendar .flatpickr-current-month,
+.flatpickr-calendar .flatpickr-current-month input.cur-year,
+.flatpickr-calendar .flatpickr-monthDropdown-months,
+.flatpickr-calendar .flatpickr-prev-month,
+.flatpickr-calendar .flatpickr-next-month {
+    color: #ffffff !important;
+    fill: #ffffff !important;
+    background: transparent !important;
+}
+
+/* 4. Weekday Text (BOTH Light & Dark Modes) */
+span.flatpickr-weekday {
+    color: #ffffff !important;
+    background: transparent !important;
+    font-weight: 600 !important;
+    border: none !important;
+}
+
+/* 5. Days Grid Background (Dark Mode) */
+html[data-theme="dark"] .flatpickr-days,
+html[data-theme="dark"] .dayContainer {
+    background: var(--bg-surface) !important;
+    border: none !important;
+}
+
+/* 6. Individual Days (Dark Mode) */
+html[data-theme="dark"] .flatpickr-day {
+    color: var(--text-primary) !important;
+    background: transparent !important;
+    border: none !important;
+}
+
+html[data-theme="dark"] .flatpickr-day:hover {
+    background: var(--bg-surface-2) !important;
+    color: #ffffff !important;
+}
+
+html[data-theme="dark"] .flatpickr-day.selected,
+html[data-theme="dark"] .flatpickr-day.startRange,
+html[data-theme="dark"] .flatpickr-day.endRange {
+    background: var(--brand-primary) !important;
+    color: #ffffff !important;
+}
+
+/* 7. Disabled / Out of Month Days (Dark Mode) */
+html[data-theme="dark"] .flatpickr-day.flatpickr-disabled,
+html[data-theme="dark"] .flatpickr-day.prevMonthDay,
+html[data-theme="dark"] .flatpickr-day.nextMonthDay {
+    color: var(--text-muted) !important;
+    background: transparent !important;
+}
+
+/* 8. Time Picker (Dark Mode) */
+html[data-theme="dark"] .flatpickr-time {
+    background: var(--bg-surface-2) !important;
+    border-top: 1px solid var(--border-color) !important;
+}
+
+html[data-theme="dark"] .flatpickr-time input,
+html[data-theme="dark"] .flatpickr-time .flatpickr-time-separator,
+html[data-theme="dark"] .flatpickr-time .flatpickr-am-pm {
+    color: var(--text-primary) !important;
+}
+
+/* ================================================================
+   FLATPICKR - DARK MODE HOVER & FOCUS FIX
+   ================================================================ */
+
+/* 1. إصلاح تأثير الماوس على الأيام */
+html[data-theme="dark"] .flatpickr-day:hover,
+html[data-theme="dark"] .flatpickr-day.prevMonthDay:hover,
+html[data-theme="dark"] .flatpickr-day.nextMonthDay:hover,
+html[data-theme="dark"] .flatpickr-day:focus {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: #ffffff !important;
+    border-color: transparent !important;
+}
+
+/* 2. إصلاح تأثير الماوس على مربعات الوقت (الساعات والدقائق) */
+html[data-theme="dark"] .flatpickr-time input:hover,
+html[data-theme="dark"] .flatpickr-time input:focus,
+html[data-theme="dark"] .flatpickr-time .flatpickr-am-pm:hover,
+html[data-theme="dark"] .flatpickr-time .flatpickr-am-pm:focus {
+    background: rgba(255, 255, 255, 0.1) !important;
+    color: #ffffff !important;
+}
+
+/* 3. إصلاح أسهم زيادة وتقليل الوقت */
+html[data-theme="dark"] .numInputWrapper span:hover {
+    background: rgba(255, 255, 255, 0.2) !important;
+}
+/* ----------------------------------------------------------------
+   GENDER SELECTION UI
+---------------------------------------------------------------- */
+.gender-selector {
+    display: flex;
+    gap: 12px;
+    margin-top: 4px;
+}
+
+.gender-btn {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 16px;
+    border-radius: var(--radius-md);
+    border: 2px solid var(--border-color);
+    background: var(--bg-surface-2);
+    cursor: pointer;
+    transition: var(--transition);
+}
+
+.gender-btn i {
+    font-size: 24px;
+    color: var(--text-muted);
+    transition: var(--transition);
+}
+
+.gender-btn span {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    transition: var(--transition);
+}
+
+.gender-btn:hover {
+    background: var(--bg-surface);
+    border-color: rgba(37, 99, 235, 0.4);
+}
+
+/* Boy Selected */
+.gender-btn.active[data-gender="boy"] {
+    border-color: var(--brand-primary);
+    background: rgba(37, 99, 235, 0.08);
+}
+.gender-btn.active[data-gender="boy"] i {
+    color: var(--brand-primary);
+}
+.gender-btn.active[data-gender="boy"] span {
+    color: var(--brand-primary);
+}
+
+/* Girl Selected */
+.gender-btn.active[data-gender="girl"] {
+    border-color: #ff69b4;
+    background: rgba(255, 105, 180, 0.08);
+}
+.gender-btn.active[data-gender="girl"] i {
+    color: #ff69b4;
+}
+.gender-btn.active[data-gender="girl"] span {
+    color: #ff69b4;
+}
+
+/* Avatar Color Classes */
+.gender-girl-icon {
+    background: rgba(255, 105, 180, 0.15) !important;
+    color: #ff69b4 !important;
+}
+
+.gender-boy-icon {
+    background: rgba(37, 99, 235, 0.15) !important;
+    color: var(--brand-primary) !important;
+}
+
