@@ -33,6 +33,16 @@ let ecgChartParent = null;       // Chart.js instance (Parent)
 let ecgBuffer = [];         // Rolling ECG values
 const ECG_BUFFER_SIZE = 80;
 
+// ── Frontend Peak Detection & BPM State ──────────────────────────
+const SAMPLE_INTERVAL_MS = 20;       // 1000ms / 50 samples
+const PEAK_HIGH_THRESHOLD = 2600;    // raw ADC value to trigger a peak
+const PEAK_LOW_THRESHOLD = 2350;    // raw ADC value to exit refractory
+const BPM_BUFFER_SIZE = 5;
+let bpmBuffer = [75, 75, 75, 75, 75]; // moving-average seed
+let peakRefractory = false;           // true while waiting for signal to drop
+let sampleIndex = 0;                  // monotonic sample counter (for elapsed-time calc)
+let lastPeakSampleIndex = -1;         // sampleIndex of the previous detected peak
+
 const deviceLastSeen = {};
 const previousSensorData = {};
 const previousLastUpdate = {};
@@ -98,7 +108,7 @@ setInterval(() => {
                     ecgBadge.classList.remove('status-offline');
                     ecgBadge.innerHTML = '<i class="fa-solid fa-circle"></i> LIVE';
                 }
-                
+
                 // Force UI Sync on Reconnection
                 if (previousSensorData[id]) {
                     try {
@@ -106,7 +116,7 @@ setInterval(() => {
                         const isParent = currentUserRole === 'parent';
                         updateSensorUI(data, isParent);
                         updateLastUpdated();
-                    } catch (e) {}
+                    } catch (e) { }
                 }
             }
         }
@@ -473,24 +483,68 @@ function listenToIncubatorList() {
             const inc = data[id];
             if (inc && inc.sensors) {
                 const incomingTimestamp = inc.sensors.lastUpdate;
-                
+
                 // Only mark as "seen now" if the timestamp is actually new/different
                 if (incomingTimestamp && incomingTimestamp !== previousLastUpdate[id]) {
                     deviceLastSeen[id] = Date.now();
                     previousLastUpdate[id] = incomingTimestamp;
-                    
+
                     // If this is the active incubator, update UI immediately
                     if (selectedIncubatorId === id) {
                         const isParent = currentUserRole === 'parent';
                         updateSensorUI(inc.sensors, isParent);
                         updateLastUpdated();
-                        
-                        // ECG
-                        if (inc.sensors.ecg !== null && inc.sensors.ecg !== undefined) {
-                            const ecgVal = parseFloat(inc.sensors.ecg);
-                            if (!isNaN(ecgVal)) {
-                                if (ecgChart) pushECGSample(ecgChart, ecgVal);
-                                if (ecgChartParent) pushECGSample(ecgChartParent, ecgVal);
+
+                        // ECG — array of up to 50 raw samples
+                        const ecgRaw = inc.sensors.ecg;
+                        const ecgArray = Array.isArray(ecgRaw)
+                            ? ecgRaw
+                            : (ecgRaw !== null && ecgRaw !== undefined ? [ecgRaw] : []);
+
+                        for (let si = 0; si < ecgArray.length; si++) {
+                            const rawValue = ecgArray[si];
+                            const voltage = (rawValue / 4095.0) * 3.3;
+
+                            if (ecgChart) pushECGSample(ecgChart, voltage);
+                            if (ecgChartParent) pushECGSample(ecgChartParent, voltage);
+
+                            // ── Peak detection ─────────────────────────────────
+                            sampleIndex++;
+
+                            if (!peakRefractory && rawValue > PEAK_HIGH_THRESHOLD) {
+                                // Peak detected
+                                peakRefractory = true;
+
+                                if (lastPeakSampleIndex >= 0) {
+                                    const timeDiffMs = (sampleIndex - lastPeakSampleIndex) * SAMPLE_INTERVAL_MS;
+
+                                    if (timeDiffMs >= 300 && timeDiffMs <= 1500) {
+                                        const instantBPM = Math.round(60000 / timeDiffMs);
+
+                                        // Update moving-average buffer
+                                        bpmBuffer.push(instantBPM);
+                                        if (bpmBuffer.length > BPM_BUFFER_SIZE) bpmBuffer.shift();
+
+                                        const smoothedBPM = Math.round(
+                                            bpmBuffer.reduce((a, b) => a + b, 0) / bpmBuffer.length
+                                        );
+
+                                        // Update HR UI elements
+                                        ['hr-val', 'p-hr-val'].forEach(id => {
+                                            const el = $(id);
+                                            if (el) el.textContent = smoothedBPM;
+                                        });
+                                        const hrProgress = $('hr-progress');
+                                        if (hrProgress) hrProgress.style.width = clamp((smoothedBPM - 80) / 120 * 100, 0, 100) + '%';
+                                        const pHrProgress = $('p-hr-progress');
+                                        if (pHrProgress) pHrProgress.style.width = clamp((smoothedBPM - 80) / 120 * 100, 0, 100) + '%';
+                                    }
+                                }
+                                lastPeakSampleIndex = sampleIndex;
+
+                            } else if (peakRefractory && rawValue < PEAK_LOW_THRESHOLD) {
+                                // Signal dropped low — exit refractory
+                                peakRefractory = false;
                             }
                         }
                     }
@@ -528,9 +582,9 @@ function renderIncubatorList(data) {
         item.className = 'sidebar-item' + (key === selectedIncubatorId ? ' active' : '');
         item.setAttribute('role', 'listitem');
         item.setAttribute('data-id', key);
-        
+
         const genderClass = inc.gender === 'girl' ? 'gender-girl-icon' : (inc.gender === 'boy' ? 'gender-boy-icon' : '');
-        
+
         item.innerHTML = `
             <div class="sidebar-item-avatar ${genderClass}">
                 <i class="fa-solid fa-baby"></i>
@@ -631,6 +685,12 @@ function selectIncubator(id, data) {
     if (typeof hideAlert === 'function') hideAlert('alert-banner');
     resetDashboardUI();
     currentDashboardState = 'connecting';
+
+    // Reset frontend peak-detection state for the new incubator
+    peakRefractory = false;
+    sampleIndex = 0;
+    lastPeakSampleIndex = -1;
+    bpmBuffer = [75, 75, 75, 75, 75];
     if (ecgChart) {
         ecgChart.data.datasets[0].data = Array(ECG_BUFFER_SIZE).fill(0);
         ecgChart.update('none');
@@ -688,7 +748,7 @@ function selectIncubator(id, data) {
 // 14. REALTIME SENSOR DATA (Handled Globally)
 // ----------------------------------------------------------------
 
-const BILIRUBIN_SLOPE = 15.0; 
+const BILIRUBIN_SLOPE = 15.0;
 const BILIRUBIN_OFFSET = 0.5;
 
 function calculateBilirubin(r, g, b) {
@@ -722,14 +782,8 @@ function updateSensorUI(data, isParent) {
         if (progress) progress.style.width = clamp(hum, 0, 100) + '%';
     }
 
-    // Heart Rate
-    const hr = parseFloat(data.heartRate);
-    if (!isNaN(hr)) {
-        const el = $(`${prefix}hr-val`);
-        if (el) el.textContent = Math.round(hr);
-        const progress = $(`${prefix}hr-progress`);
-        if (progress) progress.style.width = clamp((hr - 80) / 120 * 100, 0, 100) + '%';
-    }
+    // Heart Rate — now calculated on the frontend via peak detection.
+    // The value is updated directly in listenToIncubatorList; no Firebase read needed here.
 
     // Jaundice
     if (data.r !== undefined && data.g !== undefined && data.b !== undefined) {
@@ -876,8 +930,8 @@ function initECGChart(canvasId) {
             scales: {
                 x: { display: false },
                 y: {
-                    min: -1.5,
-                    max: 2.5,
+                    min: -0.2,
+                    max: 3.5,
                     display: true,
                     grid: { color: gridColor },
                     ticks: {
@@ -1247,13 +1301,13 @@ document.addEventListener('DOMContentLoaded', () => {
     initAuthUI();
     // Initialize slider track fill on load
     updateSliderTrack($('target-temp-slider'));
-    
+
     startPicker = flatpickr("#history-start", {
         enableTime: true,
         dateFormat: "Y-m-d H:i",
         time_24hr: true
     });
-    
+
     endPicker = flatpickr("#history-end", {
         enableTime: true,
         dateFormat: "Y-m-d H:i",
@@ -1275,7 +1329,7 @@ function getJaundiceNumeric(d) {
     const val = d ? d.jaundice : null;
     if (val === null || val === undefined) return 0;
     if (typeof val === 'number') return val;
-    
+
     const s = String(val).toLowerCase();
     if (s === 'low' || s === '0') return 2.0;
     if (s === 'medium' || s === '1') return 10.0;
@@ -1331,17 +1385,17 @@ function initHistoryCharts() {
 async function fetchHistoryAndRender(incubatorId) {
     if (!incubatorId) return;
     targetIncubatorHistory = incubatorId;
-    
+
     const modal = $('history-modal');
     if (modal) modal.classList.remove('hidden');
-    
+
     applyHistoryFilter(currentHistoryFilter);
 }
 
 async function applyHistoryFilter(filter) {
     currentHistoryFilter = filter;
     if (!targetIncubatorHistory) return;
-    
+
     const btns = document.querySelectorAll('.history-toolbar .btn-filter');
     btns.forEach(b => b.classList.remove('active'));
     if (filter === '1H' && btns[0]) btns[0].classList.add('active');
@@ -1350,19 +1404,19 @@ async function applyHistoryFilter(filter) {
     else if (filter === '30D' && btns[3]) btns[3].classList.add('active');
     else if (filter === 'ALL' && btns[4]) btns[4].classList.add('active');
     else if (filter === 'CUSTOM' && btns[5]) btns[5].classList.add('active');
-    
+
     const loadingEl = $('history-loading');
     const emptyEl = $('history-empty');
     const containerEl = $('history-charts-container');
-    
+
     if (loadingEl) loadingEl.classList.remove('hidden');
     if (emptyEl) emptyEl.classList.add('hidden');
     if (containerEl) containerEl.style.display = 'none';
-    
+
     const now = Date.now();
     let startTime = 0;
     let endTime = now;
-    
+
     if (filter === '1H') startTime = now - 3600000;
     else if (filter === '24H') startTime = now - 86400000;
     else if (filter === '7D') startTime = now - 604800000;
@@ -1376,7 +1430,7 @@ async function applyHistoryFilter(filter) {
     else if (filter === 'ALL') {
         startTime = 0;
     }
-    
+
     try {
         let ref = db.ref(`History/${targetIncubatorHistory}`).orderByKey();
         if (startTime > 0) {
@@ -1388,27 +1442,27 @@ async function applyHistoryFilter(filter) {
 
         const snap = await ref.once('value');
         const rawData = snap.val();
-        
+
         if (!rawData) {
             if (loadingEl) loadingEl.classList.add('hidden');
             if (emptyEl) emptyEl.classList.remove('hidden');
             return;
         }
 
-        const keys = Object.keys(rawData).sort((a,b) => Number(a) - Number(b));
-        
+        const keys = Object.keys(rawData).sort((a, b) => Number(a) - Number(b));
+
         initHistoryCharts();
-        
+
         let parsedData = { temperature: [], humidity: [], heartRate: [], jaundice: [], ecg: [] };
         let lastTs = null;
-        
+
         const total = keys.length;
         let processed = 0;
 
         for (let i = 0; i < total; i++) {
             const ts = Number(keys[i]);
             const d = rawData[keys[i]];
-            
+
             if (lastTs !== null && (ts - lastTs) > 10000) {
                 const dropTs1 = lastTs + 1;
                 parsedData.temperature.push({ x: dropTs1, y: 0 });
@@ -1416,7 +1470,7 @@ async function applyHistoryFilter(filter) {
                 parsedData.heartRate.push({ x: dropTs1, y: 0 });
                 parsedData.jaundice.push({ x: dropTs1, y: 0 });
                 parsedData.ecg.push({ x: dropTs1, y: 0 });
-                
+
                 const dropTs2 = ts - 1;
                 parsedData.temperature.push({ x: dropTs2, y: 0 });
                 parsedData.humidity.push({ x: dropTs2, y: 0 });
@@ -1424,23 +1478,25 @@ async function applyHistoryFilter(filter) {
                 parsedData.jaundice.push({ x: dropTs2, y: 0 });
                 parsedData.ecg.push({ x: dropTs2, y: 0 });
             }
-            
+
             parsedData.temperature.push({ x: ts, y: parseFloat(d.temperature) || 0 });
             parsedData.humidity.push({ x: ts, y: parseFloat(d.humidity) || 0 });
             parsedData.heartRate.push({ x: ts, y: parseFloat(d.heartRate) || 0 });
             parsedData.jaundice.push({ x: ts, y: getJaundiceNumeric(d) });
-            parsedData.ecg.push({ x: ts, y: parseFloat(d.ecg) || 0 });
-            
+            // ECG may now arrive as an array; use the first sample to represent the second
+            const rawEcgVal = Array.isArray(d.ecg) ? d.ecg[0] : d.ecg;
+            parsedData.ecg.push({ x: ts, y: ((parseFloat(rawEcgVal) || 0) / 4095.0) * 3.3 });
+
             lastTs = ts;
             processed++;
-            
+
             if (processed % 250 === 0) {
                 const prog = $('history-progress-bar');
                 if (prog) prog.style.width = (processed / total * 100) + '%';
                 await new Promise(resolve => setTimeout(resolve, 0));
             }
         }
-        
+
         // [FUTURE: Insert Data Analysis / AI Predictions Here]
 
         historyCharts['temperature'].data.datasets[0].data = parsedData.temperature;
@@ -1448,13 +1504,13 @@ async function applyHistoryFilter(filter) {
         historyCharts['heartRate'].data.datasets[0].data = parsedData.heartRate;
         historyCharts['jaundice'].data.datasets[0].data = parsedData.jaundice;
         historyCharts['ecg'].data.datasets[0].data = parsedData.ecg;
-        
+
         Object.values(historyCharts).forEach(c => c.update('none'));
-        
+
         if (loadingEl) loadingEl.classList.add('hidden');
         if (containerEl) containerEl.style.display = 'grid';
-        
-    } catch(e) {
+
+    } catch (e) {
         console.error("Error fetching history:", e);
         if (loadingEl) loadingEl.classList.add('hidden');
         if (emptyEl) emptyEl.classList.remove('hidden');
