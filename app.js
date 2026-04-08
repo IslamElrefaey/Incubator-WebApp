@@ -1,5 +1,5 @@
 // ================================================================
-// NeoGuard — Smart Infant Incubator System
+// Team 3 — Smart Infant Incubator System
 // app.js — Main Application Logic
 // ================================================================
 
@@ -210,7 +210,7 @@ async function copyToClipboard(text, btn) {
 // ----------------------------------------------------------------
 // 4. DARK MODE
 // ----------------------------------------------------------------
-const THEME_KEY = 'neoguard_theme';
+const THEME_KEY = 'Team 3_theme';
 
 function applyTheme(theme) {
     document.documentElement.setAttribute('data-theme', theme);

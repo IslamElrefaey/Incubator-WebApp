@@ -4,9 +4,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>NeoGuard — Smart Infant Incubator System</title>
+    <title>Team 3 — Smart Infant Incubator System</title>
     <meta name="description"
-        content="NeoGuard is a professional real-time monitoring system for smart neonatal incubators, designed for doctors and parents.">
+        content="Team 3 is a professional real-time monitoring system for smart neonatal incubators, designed for doctors and parents.">
 
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -19,7 +19,8 @@
 
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script
+        src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
 
     <!-- Flatpickr -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -57,7 +58,7 @@
                 <div class="brand-logo">
                     <i class="fa-solid fa-heart-pulse"></i>
                 </div>
-                <h1 class="brand-name">NeoGuard</h1>
+                <h1 class="brand-name">Team 3</h1>
                 <p class="brand-tagline">Smart Infant Incubator Monitoring System</p>
             </div>
 
@@ -204,7 +205,7 @@
                 <div class="brand-logo-sm">
                     <i class="fa-solid fa-heart-pulse"></i>
                 </div>
-                <span class="nav-brand-name">NeoGuard</span>
+                <span class="nav-brand-name">Team 3</span>
                 <span class="nav-role-badge role-doctor">Doctor</span>
             </div>
 
@@ -315,7 +316,9 @@
                                     <span>Live Monitoring</span>
                                 </div>
                             </div>
-                            <button id="open-history-btn" class="btn-icon-circular history-btn" aria-label="View History" title="View Historical Data" onclick="fetchHistoryAndRender(selectedIncubatorId)">
+                            <button id="open-history-btn" class="btn-icon-circular history-btn"
+                                aria-label="View History" title="View Historical Data"
+                                onclick="fetchHistoryAndRender(selectedIncubatorId)">
                                 <i class="fa-solid fa-clock-rotate-left"></i>
                             </button>
                         </div>
@@ -532,7 +535,7 @@
                 <div class="brand-logo-sm">
                     <i class="fa-solid fa-heart-pulse"></i>
                 </div>
-                <span class="nav-brand-name">NeoGuard</span>
+                <span class="nav-brand-name">Team 3</span>
                 <span class="nav-role-badge role-parent">Parent</span>
             </div>
 
@@ -828,13 +831,15 @@
     <!-- ============================================================
          MODAL: Historical Data
     ============================================================ -->
-    <div id="history-modal" class="modal-overlay hidden" role="dialog" aria-modal="true" aria-labelledby="history-title">
+    <div id="history-modal" class="modal-overlay hidden" role="dialog" aria-modal="true"
+        aria-labelledby="history-title">
         <div class="modal-box modal-box-large history-modal-box">
             <div class="modal-header">
                 <h2 id="history-title">
                     <i class="fa-solid fa-clock-rotate-left"></i> Patient Historical Data
                 </h2>
-                <button class="modal-close-btn" id="history-close-btn" aria-label="Close modal" onclick="document.getElementById('history-modal').classList.add('hidden')">
+                <button class="modal-close-btn" id="history-close-btn" aria-label="Close modal"
+                    onclick="document.getElementById('history-modal').classList.add('hidden')">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
@@ -852,7 +857,8 @@
                     <div class="custom-range" id="history-custom-range">
                         <div class="datetime-wrapper" id="history-start-wrapper">
                             <i class="fa-solid fa-calendar-day"></i>
-                            <input type="text" class="datetime-picker" id="history-start" placeholder="Start Date & Time">
+                            <input type="text" class="datetime-picker" id="history-start"
+                                placeholder="Start Date & Time">
                         </div>
                         <span>to</span>
                         <div class="datetime-wrapper" id="history-end-wrapper">
@@ -873,7 +879,7 @@
                             <div id="history-progress-bar" style="width: 0%"></div>
                         </div>
                     </div>
-                    
+
                     <div id="history-empty" class="history-state hidden">
                         <i class="fa-solid fa-inbox"></i>
                         <p>No historical data available for this period.</p>
@@ -881,23 +887,28 @@
 
                     <!-- 5 Charts -->
                     <div class="history-chart-card">
-                        <span class="chart-title"><i class="fa-solid fa-temperature-half" style="color: var(--temp-color)"></i> Temperature</span>
+                        <span class="chart-title"><i class="fa-solid fa-temperature-half"
+                                style="color: var(--temp-color)"></i> Temperature</span>
                         <div class="history-canvas-wrapper"><canvas id="historyTempChart"></canvas></div>
                     </div>
                     <div class="history-chart-card">
-                        <span class="chart-title"><i class="fa-solid fa-droplet" style="color: var(--hum-color)"></i> Humidity</span>
+                        <span class="chart-title"><i class="fa-solid fa-droplet" style="color: var(--hum-color)"></i>
+                            Humidity</span>
                         <div class="history-canvas-wrapper"><canvas id="historyHumChart"></canvas></div>
                     </div>
                     <div class="history-chart-card">
-                        <span class="chart-title"><i class="fa-solid fa-heart-pulse" style="color: var(--hr-color)"></i> Heart Rate</span>
+                        <span class="chart-title"><i class="fa-solid fa-heart-pulse" style="color: var(--hr-color)"></i>
+                            Heart Rate</span>
                         <div class="history-canvas-wrapper"><canvas id="historyHRChart"></canvas></div>
                     </div>
                     <div class="history-chart-card">
-                        <span class="chart-title"><i class="fa-solid fa-eye" style="color: var(--jaundice-color)"></i> Jaundice (Bilirubin)</span>
+                        <span class="chart-title"><i class="fa-solid fa-eye" style="color: var(--jaundice-color)"></i>
+                            Jaundice (Bilirubin)</span>
                         <div class="history-canvas-wrapper"><canvas id="historyJaundiceChart"></canvas></div>
                     </div>
                     <div class="history-chart-card history-chart-full">
-                        <span class="chart-title"><i class="fa-solid fa-wave-square" style="color: var(--brand-primary)"></i> ECG</span>
+                        <span class="chart-title"><i class="fa-solid fa-wave-square"
+                                style="color: var(--brand-primary)"></i> ECG</span>
                         <div class="history-canvas-wrapper"><canvas id="historyEcgChart"></canvas></div>
                     </div>
                 </div>
